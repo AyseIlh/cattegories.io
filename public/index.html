@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Name City Animal - Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="join-screen" class="screen">
+    <div class="card paper-card">
+      <h1>Name City Animal</h1>
+      <p class="subtitle" id="join-subtitle">Everyone plays the same nonstop round. Join and you're in as soon as the round starts.</p>
+      <p class="subtitle room-error hidden" id="room-error"></p>
+      <label for="nickname-input">Nickname</label>
+      <input id="nickname-input" type="text" maxlength="20" placeholder="E.g. Alex" />
+      <label for="country-select">Country</label>
+      <select id="country-select"></select>
+      <button id="continue-button">Continue</button>
+      <div id="room-error-fallbacks" class="hidden">
+        <button id="fallback-public-button">Play Public Instead</button>
+        <button id="fallback-create-button">Create a New Room Instead</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mode-screen" class="screen hidden">
+    <div class="card paper-card">
+      <h1>Name City Animal</h1>
+      <button id="play-public-button">Play Public</button>
+      <p class="subtitle">Join the live global game with everyone online right now.</p>
+      <button id="play-private-button">Play with a Friend</button>
+      <p class="subtitle">Create a private room and invite friends with a link or code.</p>
+      <button id="join-code-button">Join with a Code</button>
+      <p class="subtitle">Got a 4-letter room code from a friend? Enter it here.</p>
+      <div id="join-code-area" class="hidden">
+        <input id="room-code-input" type="text" maxlength="4" placeholder="E.g. K7XM" autocomplete="off" />
+        <p class="subtitle room-error hidden" id="code-error"></p>
+        <button id="join-code-submit">Join Room</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="waiting-screen" class="screen hidden">
+    <div class="card paper-card">
+      <h1>Room <span id="room-code-display">------</span></h1>
+      <p class="subtitle">Share this link or code with your friends:</p>
+      <input id="room-link-display" type="text" readonly />
+      <button id="copy-link-button">Copy Link</button>
+
+      <div class="note">
+        <h3>Players</h3>
+        <ol id="waiting-player-list"></ol>
+      </div>
+
+      <button id="start-button" class="hidden">Start Game</button>
+      <p class="subtitle" id="waiting-hint">Waiting for the host to start...</p>
+    </div>
+  </div>
+
+  <div id="game-screen" class="screen hidden">
+    <div class="game-layout">
+      <main class="paper">
+        <div class="hole hole-1"></div>
+        <div class="hole hole-2"></div>
+        <div class="hole hole-3"></div>
+
+        <div class="paper-header">
+          <div class="paper-title">Name City Animal</div>
+          <div class="paper-timer">&#9201; <span id="timer">60</span></div>
+        </div>
+
+        <div class="row labels-row">
+          <div>Letter</div>
+          <div>Name</div>
+          <div>City</div>
+          <div>Animal</div>
+          <div>Plant</div>
+          <div>Food</div>
+          <div>Object</div>
+          <div class="score-label">Score</div>
+        </div>
+
+        <div id="history"></div>
+
+        <div class="row round-row active-row" id="active-row">
+          <div class="letter-cell" id="current-letter">-</div>
+          <div class="cell">
+            <input id="name-input" type="text" maxlength="40" autocomplete="off" />
+            <span class="cell-text hidden"></span>
+          </div>
+          <div class="cell">
+            <input id="city-input" type="text" maxlength="40" autocomplete="off" />
+            <span class="cell-text hidden"></span>
+          </div>
+          <div class="cell">
+            <input id="animal-input" type="text" maxlength="40" autocomplete="off" />
+            <span class="cell-text hidden"></span>
+          </div>
+          <div class="cell">
+            <input id="plant-input" type="text" maxlength="40" autocomplete="off" />
+            <span class="cell-text hidden"></span>
+          </div>
+          <div class="cell">
+            <input id="food-input" type="text" maxlength="40" autocomplete="off" />
+            <span class="cell-text hidden"></span>
+          </div>
+          <div class="cell">
+            <input id="object-input" type="text" maxlength="40" autocomplete="off" />
+            <span class="cell-text hidden"></span>
+          </div>
+          <div class="score-cell" id="active-score">?</div>
+        </div>
+
+        <div id="fillers"></div>
+
+        <div class="paper-footer">
+          <div id="me-line"></div>
+          <div id="phase-hint"></div>
+        </div>
+      </main>
+
+      <aside class="sidebar">
+        <div class="note">
+          <h3>Players</h3>
+          <ol id="player-leaderboard"></ol>
+        </div>
+        <div class="note note-tilt">
+          <h3>Nations</h3>
+          <ol id="nation-leaderboard"></ol>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="countries.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

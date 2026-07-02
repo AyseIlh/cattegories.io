@@ -1,0 +1,481 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --desk: #e8e4d8;
+  --paper: #fdfbf2;
+  --paper-shadow: #d5d0c0;
+  --ruled-line: #aecbe3;
+  --cell-line: #dcd6c4;
+  --margin-red: #e08c8c;
+  --ink: #42413e;
+  --ink-faint: #c8c2b0;
+  --letter-red: #b3543f;
+  --score-green: #4a7c2f;
+  --invalid-strike: #c46a55;
+  --invalid-text: #a09a88;
+  --label: #9a917d;
+  --active-bg: #fff7d9;
+  --hand-font: 'Caveat', cursive;
+  --print-font: 'Patrick Hand', cursive;
+}
+
+body {
+  margin: 0;
+  font-family: var(--print-font), sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+.screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+#game-screen {
+  display: block;
+  padding: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- Join screen ---------- */
+
+.card {
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 32px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 3px 4px 0 var(--paper-shadow);
+}
+
+.card h1 {
+  margin: 0 0 8px;
+  font-family: var(--hand-font);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.subtitle {
+  color: var(--label);
+  font-size: 15px;
+  margin: 0 0 20px;
+}
+
+label {
+  display: block;
+  font-size: 15px;
+  color: var(--label);
+  margin-bottom: 4px;
+  margin-top: 14px;
+}
+
+input[type="text"], select {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 2px solid var(--ruled-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--hand-font);
+  font-size: 20px;
+}
+
+input[type="text"]:focus, select:focus {
+  outline: none;
+  border-bottom-color: var(--letter-red);
+  background: var(--active-bg);
+}
+
+input::placeholder {
+  color: var(--ink-faint);
+}
+
+button {
+  width: 100%;
+  margin-top: 24px;
+  padding: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--hand-font);
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--active-bg);
+}
+
+/* ---------- Mode / waiting screens ---------- */
+
+.room-error {
+  color: var(--letter-red);
+}
+
+#room-error-fallbacks button {
+  margin-top: 12px;
+}
+
+#mode-screen button + .subtitle {
+  margin-top: 6px;
+}
+
+#mode-screen .subtitle {
+  margin-bottom: 20px;
+}
+
+#room-code-display {
+  color: var(--letter-red);
+  letter-spacing: 2px;
+}
+
+#room-code-input {
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 8px;
+  font-size: 26px;
+  margin-top: 8px;
+}
+
+#join-code-area .room-error {
+  margin: 8px 0 0;
+}
+
+#join-code-submit {
+  margin-top: 14px;
+}
+
+#room-link-display {
+  margin-bottom: 12px;
+}
+
+#copy-link-button {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+#waiting-screen .note {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  transform: none;
+}
+
+#waiting-hint {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+/* ---------- Paper sheet (fills the whole screen) ---------- */
+
+.game-layout {
+  width: 100%;
+}
+
+.paper {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--paper);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 14px;
+}
+
+.paper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: clamp(36px, 6.5%, 52px);
+  width: 1.5px;
+  background: var(--margin-red);
+}
+
+.paper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(clamp(36px, 6.5%, 52px) + 4px);
+  width: 1.5px;
+  background: var(--margin-red);
+  opacity: 0.5;
+}
+
+.hole {
+  position: absolute;
+  left: 12px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--desk);
+  box-shadow: inset 1px 1px 2px #c8c3b2;
+  z-index: 2;
+}
+
+.hole-1 { top: 15%; }
+.hole-2 { top: 50%; }
+.hole-3 { top: 85%; }
+
+.paper-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 20px 4px calc(clamp(36px, 6.5%, 52px) + 16px);
+  font-family: var(--hand-font);
+}
+
+.paper-title {
+  font-size: clamp(22px, 4vw, 30px);
+  font-weight: 700;
+}
+
+.paper-timer {
+  font-size: clamp(18px, 3.2vw, 24px);
+  color: var(--letter-red);
+  font-weight: 700;
+}
+
+/* ---------- Rows ---------- */
+
+.row {
+  display: grid;
+  grid-template-columns: clamp(28px, 6vw, 44px) repeat(6, 1fr) clamp(38px, 7vw, 54px);
+  align-items: end;
+  padding: 0 16px 0 calc(clamp(36px, 6.5%, 52px) + 16px);
+}
+
+.labels-row {
+  font-size: clamp(11px, 1.8vw, 14px);
+  color: var(--label);
+  padding-bottom: 2px;
+}
+
+.labels-row > div {
+  text-align: center;
+}
+
+.labels-row > div:first-child {
+  text-align: left;
+}
+
+.labels-row .score-label {
+  text-align: right;
+}
+
+.round-row {
+  min-height: clamp(30px, 5.2vw, 38px);
+  border-bottom: 1.5px solid var(--ruled-line);
+  font-family: var(--hand-font);
+  font-size: clamp(15px, 2.8vw, 22px);
+  color: var(--ink);
+}
+
+.round-row > * + * {
+  border-left: 1px solid var(--cell-line);
+}
+
+#fillers {
+  flex: 1;
+  --row-h: clamp(34px, 4.5vh, 44px);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--row-h) - 1.5px),
+    var(--ruled-line) calc(var(--row-h) - 1.5px),
+    var(--ruled-line) var(--row-h)
+  );
+}
+
+.letter-cell {
+  font-weight: 700;
+  font-size: clamp(18px, 3.4vw, 26px);
+  color: var(--letter-red);
+  padding-bottom: 1px;
+}
+
+.cell {
+  text-align: center;
+  overflow: hidden;
+  padding: 0 3px;
+}
+
+.cell input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--hand-font);
+  font-size: inherit;
+  color: var(--ink);
+  text-align: center;
+  padding: 2px 0;
+}
+
+.cell input:focus {
+  outline: none;
+  background: var(--active-bg);
+  border-bottom: none;
+}
+
+.cell-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+
+.cell-text.invalid {
+  text-decoration: line-through wavy var(--invalid-strike);
+  color: var(--invalid-text);
+}
+
+.cell-text.empty {
+  color: var(--ink-faint);
+}
+
+.score-cell {
+  text-align: right;
+  font-weight: 700;
+  color: var(--score-green);
+  padding-bottom: 1px;
+  padding-right: 2px;
+}
+
+.score-cell.pending {
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
+.active-row.answering {
+  background: var(--active-bg);
+}
+
+/* ---------- Footer ---------- */
+
+.paper-footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 250px 0 calc(clamp(36px, 6.5%, 52px) + 16px);
+  font-size: clamp(12px, 2vw, 15px);
+  color: var(--label);
+}
+
+@media (max-width: 640px) {
+  .paper-footer {
+    padding-right: 170px;
+  }
+}
+
+/* ---------- Sticky notes (pinned bottom right) ---------- */
+
+.sidebar {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 215px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 5;
+}
+
+.note {
+  background: #fdf6c9;
+  padding: 12px 14px;
+  box-shadow: 2px 3px 6px rgba(90, 80, 60, 0.25);
+  transform: rotate(-1.5deg);
+}
+
+.note.note-tilt {
+  background: #dcefd8;
+  transform: rotate(1deg);
+}
+
+.note h3 {
+  margin: 0 0 6px;
+  font-family: var(--hand-font);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.note ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.note li {
+  padding: 2px 0;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.note .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note .score {
+  color: var(--label);
+  flex-shrink: 0;
+}
+
+/* ---------- Narrow layouts ---------- */
+
+@media (max-width: 640px) {
+  .paper::before {
+    left: 26px;
+  }
+
+  .paper::after {
+    left: 30px;
+  }
+
+  .paper-header,
+  .row,
+  .paper-footer {
+    padding-left: 40px;
+  }
+
+  .hole {
+    left: 6px;
+    width: 10px;
+    height: 10px;
+  }
+
+  .sidebar {
+    right: 8px;
+    bottom: 8px;
+    width: 150px;
+    gap: 8px;
+  }
+
+  .note h3 {
+    font-size: 17px;
+  }
+
+  .note li {
+    font-size: 12px;
+  }
+}
