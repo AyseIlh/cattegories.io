@@ -3,6 +3,7 @@ const express = require('express');
 const { Server } = require('socket.io');
 const http = require('http');
 const { WORD_LISTS } = require('./wordlists');
+const { COUNTRIES } = require('./public/countries');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,8 +27,16 @@ const ROOM_CODE_LENGTH = 4;
 //          answers: Map<socketId, {name, city, animal, plant, food, object}>, timer }
 const rooms = new Map();
 
+const VALID_COUNTRY_CODES = new Set(COUNTRIES.map(([code]) => code));
+
+// Clients can emit anything (including no payload at all); never trust a
+// value to be a string before treating it as one.
+function asString(value) {
+  return typeof value === 'string' ? value : '';
+}
+
 function normalize(str) {
-  return (str || '').trim().toLowerCase();
+  return asString(str).trim().toLowerCase();
 }
 
 function generateRoomCode() {
@@ -100,6 +109,9 @@ function publicState(room) {
     letter: room.currentLetter,
     categories: CATEGORIES,
     phaseEndsAt: room.phaseEndsAt,
+    // The client derives "time left" from serverNow instead of its own
+    // clock, so a skewed local clock can't break the countdown.
+    serverNow: Date.now(),
     roomId: room.id,
     type: room.type,
     hostId: room.hostId,
@@ -168,29 +180,73 @@ function endAnswerPhase(room) {
     letter: room.currentLetter,
     results: Object.fromEntries(results),
     phaseEndsAt: room.phaseEndsAt,
+    serverNow: Date.now(),
   });
   broadcastLeaderboards(room);
   room.timer = setTimeout(() => startAnswerPhase(room), RESULT_PHASE_MS);
 }
 
 function buildPlayer(nickname, countryCode) {
+  const code = asString(countryCode).slice(0, 2).toUpperCase();
   return {
-    nickname: (nickname || '').trim().slice(0, 20) || 'Player',
-    countryCode: (countryCode || '').slice(0, 2).toUpperCase(),
+    nickname: asString(nickname).trim().slice(0, 20) || 'Player',
+    countryCode: VALID_COUNTRY_CODES.has(code) ? code : '',
     score: 0,
     connected: true,
   };
 }
 
+// Removes the socket from whatever room it is currently in, with all the
+// side effects that implies (host migration, empty-room teardown, pausing
+// an emptied public room). Used by both disconnect and re-join, so a
+// socket can never linger in two rooms at once.
+function leaveCurrentRoom(socket) {
+  const room = getRoomForSocket(socket);
+  if (!room) return;
+
+  socket.leave(room.id);
+  socket.data.roomId = null;
+  room.players.delete(socket.id);
+  room.answers.delete(socket.id);
+
+  if (room.phase === 'waiting' && room.hostId === socket.id) {
+    const next = room.players.keys().next();
+    room.hostId = next.done ? null : next.value;
+  }
+
+  if (room.players.size === 0) {
+    if (room.type === 'private') {
+      destroyRoom(room);
+    } else {
+      // Public room idles when empty: stop the round loop, resume on next join.
+      if (room.timer) clearTimeout(room.timer);
+      room.timer = null;
+      room.currentLetter = null;
+    }
+    return;
+  }
+
+  broadcastLeaderboards(room);
+  if (room.phase === 'waiting') {
+    io.to(room.id).emit('state:sync', publicState(room));
+  }
+}
+
 function joinRoom(socket, room, nickname, countryCode) {
+  leaveCurrentRoom(socket);
   room.players.set(socket.id, buildPlayer(nickname, countryCode));
   socket.join(room.id);
   socket.data.roomId = room.id;
+  // Wake an idle public room now that it has a player again.
+  if (room.type === 'public' && !room.timer) {
+    startAnswerPhase(room);
+  }
 }
 
 io.on('connection', (socket) => {
-  socket.on('player:join', ({ nickname, countryCode, roomId }) => {
-    const room = rooms.get(roomId);
+  socket.on('player:join', (payload) => {
+    const { nickname, countryCode, roomId } = payload || {};
+    const room = rooms.get(asString(roomId));
     if (!room) {
       socket.emit('room:error', { message: 'Room not found.' });
       return;
@@ -200,15 +256,17 @@ io.on('connection', (socket) => {
     broadcastLeaderboards(room);
   });
 
-  socket.on('room:create', ({ nickname, countryCode }) => {
+  socket.on('room:create', (payload) => {
+    const { nickname, countryCode } = payload || {};
     const room = createRoom({ id: generateRoomCode(), type: 'private', hostId: socket.id });
     joinRoom(socket, room, nickname, countryCode);
     socket.emit('room:created', publicState(room));
     broadcastLeaderboards(room);
   });
 
-  socket.on('room:join', ({ roomId, nickname, countryCode }) => {
-    const normalizedId = (roomId || '').trim().toUpperCase();
+  socket.on('room:join', (payload) => {
+    const { roomId, nickname, countryCode } = payload || {};
+    const normalizedId = asString(roomId).trim().toUpperCase();
     const room = rooms.get(normalizedId);
     if (!room) {
       socket.emit('room:error', { message: 'Room not found. It may have expired or the code is wrong.' });
@@ -243,32 +301,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    const room = getRoomForSocket(socket);
-    if (!room) return;
-
-    room.players.delete(socket.id);
-    room.answers.delete(socket.id);
-
-    if (room.phase === 'waiting' && room.hostId === socket.id) {
-      const next = room.players.keys().next();
-      room.hostId = next.done ? null : next.value;
-    }
-
-    if (room.type === 'private' && room.players.size === 0) {
-      destroyRoom(room);
-      return;
-    }
-
-    broadcastLeaderboards(room);
-    if (room.phase === 'waiting') {
-      io.to(room.id).emit('state:sync', publicState(room));
-    }
+    leaveCurrentRoom(socket);
   });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running: http://localhost:${PORT}`);
-  const publicRoom = createRoom({ id: 'public', type: 'public' });
-  startAnswerPhase(publicRoom);
+  // The public room starts idle; its round loop wakes when the first player joins.
+  createRoom({ id: 'public', type: 'public' });
 });

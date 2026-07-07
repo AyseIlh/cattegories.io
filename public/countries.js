@@ -27,3 +27,9 @@ function flagEmoji(countryCode) {
   const codePoints = [...countryCode.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
   return String.fromCodePoint(...codePoints);
 }
+
+// Also loadable with require() on the server (country-code validation);
+// in the browser `module` doesn't exist and this is skipped.
+if (typeof module !== 'undefined') {
+  module.exports = { COUNTRIES };
+}

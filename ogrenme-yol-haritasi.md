@@ -1,5 +1,7 @@
 # İsim Şehir Hayvan — Online Çok Oyunculu Oyun: Yol Haritası
 
+> **Not (2026-07-08):** Bu belge başlangıçta bir "kendi kendine öğrenme" planı olarak yazıldı; proje artık Claude tarafından doğrudan geliştiriliyor ve bu belge yapım sırası/başvuru dokümanı olarak kullanılıyor. Bazı kararlar güncellendi: oyun adı şimdilik "categories.io", odasız tek akış yerine public + private oda yapısı var, dil İngilizce. Güncel durum için git geçmişine bakın.
+
 Oda yok. Herkes aynı, sürekli akan tek oyuna hızlı bir nickname ile katılır. Sunucu her 60 saniyede bir yeni harf seçip herkese aynı anda yollar, süre bitince cevapları toplar, en az yazılan cevaba en yüksek puanı verir ve yeni tur başlar. Nickname/puan şimdilik sadece o oturum için geçerli; kalıcı hesap (Google auth) ve puan ekonomisi (kozmetik özelleştirmeler) ileride eklenecek.
 
 **Teknoloji:** JavaScript (hem frontend hem Node.js backend), gerçek zamanlı iletişim için Socket.io, arayüz için düz HTML/CSS/JS.

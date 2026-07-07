@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Post-it note, slightly tilted, with a lifted bottom-right corner -->
+  <g transform="rotate(-4 32 32)">
+    <path d="M8 8 h48 v42 q-14 8 -48 6 z" fill="#f7efa3"/>
+    <path d="M56 50 q-10 7 -20 6 l20 -2 z" fill="#d8ca6e"/>
+    <text x="31" y="45" font-family="Comic Sans MS, Chalkboard SE, cursive" font-size="36" font-weight="bold" fill="#b3543f" text-anchor="middle">C</text>
+  </g>
+</svg>

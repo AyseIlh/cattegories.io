@@ -2,8 +2,11 @@
   "name": "online-categories",
   "version": "0.1.0",
   "private": true,
-  "description": "İsim Şehir Hayvan - odasız, sürekli akan online çok oyunculu oyun",
+  "description": "categories.io — real-time multiplayer word game: one letter, 60 seconds, six categories, public and private rooms",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js"
   },

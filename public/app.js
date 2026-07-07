@@ -71,6 +71,25 @@ let resultsShown = false; // true while the active row displays a finished round
 let myRoomId = null;
 let amIHost = false;
 let pendingRoomId = null;
+let hasJoinedOnce = false; // set after the first successful room entry
+
+// Convert a server-stamped deadline to this device's clock, so a skewed
+// local clock can't break the countdown. serverNow is sampled when the
+// server built the message, so the small network delay cancels out of
+// (phaseEndsAt - serverNow).
+function localPhaseEnd({ phaseEndsAt, serverNow }) {
+  if (!serverNow) return phaseEndsAt;
+  return Date.now() + (phaseEndsAt - serverNow);
+}
+
+// If the connection drops (wifi hiccup, server restart), socket.io
+// reconnects with a fresh identity — rejoin the same room automatically
+// instead of leaving the player typing into the void.
+socket.on('connect', () => {
+  if (hasJoinedOnce && myNickname && myRoomId) {
+    socket.emit('player:join', { nickname: myNickname, countryCode: myCountry, roomId: myRoomId });
+  }
+});
 
 const roomParam = new URLSearchParams(window.location.search).get('room');
 if (roomParam) {
@@ -209,8 +228,17 @@ function sendAnswers() {
   socket.emit('answer:update', payload);
 }
 
+// Sending on every keystroke is wasteful; batch bursts of typing into one
+// message. 150ms is well under the end-of-round race that network latency
+// already imposes.
+let answerSendTimer = null;
+function queueSendAnswers() {
+  clearTimeout(answerSendTimer);
+  answerSendTimer = setTimeout(sendAnswers, 150);
+}
+
 for (const category of CATEGORIES) {
-  categoryInputs[category].addEventListener('input', sendAnswers);
+  categoryInputs[category].addEventListener('input', queueSendAnswers);
 }
 
 function startCountdown(endsAt) {
@@ -273,7 +301,7 @@ function enterAnsweringPhase(state) {
   phaseHint.textContent = '';
   categoryInputs.name.focus();
   activeRow.scrollIntoView({ block: 'nearest' });
-  startCountdown(state.phaseEndsAt);
+  startCountdown(localPhaseEnd(state));
 }
 
 function showResults(results) {
@@ -314,6 +342,7 @@ function renderWaitingScreen(state) {
 socket.on('room:created', (state) => {
   myRoomId = state.roomId;
   amIHost = true;
+  hasJoinedOnce = true;
   renderWaitingScreen(state);
   showScreen('waiting');
 });
@@ -336,6 +365,7 @@ socket.on('room:error', ({ message }) => {
 socket.on('state:sync', (state) => {
   myRoomId = state.roomId;
   amIHost = state.hostId === socket.id;
+  hasJoinedOnce = true;
   currentLetterEl.textContent = state.letter || '-';
 
   if (state.phase === 'waiting') {
@@ -353,7 +383,7 @@ socket.on('state:sync', (state) => {
     }
     activeRow.classList.remove('answering');
     phaseHint.textContent = 'Next letter coming up...';
-    startCountdown(state.phaseEndsAt);
+    startCountdown(localPhaseEnd(state));
     showScreen('game');
   }
 });
@@ -363,9 +393,9 @@ socket.on('round:start', (state) => {
   showScreen('game');
 });
 
-socket.on('round:results', ({ results, phaseEndsAt }) => {
+socket.on('round:results', ({ results, phaseEndsAt, serverNow }) => {
   showResults(results);
-  startCountdown(phaseEndsAt);
+  startCountdown(localPhaseEnd({ phaseEndsAt, serverNow }));
 });
 
 function leaderboardRow(nameText, score) {
