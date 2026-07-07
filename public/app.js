@@ -47,6 +47,13 @@ const startButton = document.getElementById('start-button');
 const waitingHint = document.getElementById('waiting-hint');
 
 const currentLetterEl = document.getElementById('current-letter');
+const activeMagnifier = document.getElementById('active-magnifier');
+const summaryPopup = document.getElementById('summary-popup');
+const summaryBackdrop = document.getElementById('summary-backdrop');
+const summaryLetterEl = document.getElementById('summary-letter');
+const summaryGrid = document.getElementById('summary-grid');
+const summaryClose = document.getElementById('summary-close');
+const summaryContinue = document.getElementById('summary-continue');
 const timerEl = document.getElementById('timer');
 const historyEl = document.getElementById('history');
 const activeRow = document.getElementById('active-row');
@@ -252,13 +259,85 @@ function startCountdown(endsAt) {
   countdownInterval = setInterval(tick, 250);
 }
 
+// ---------- Round-summary magnifier popup ----------
+
+let lastRoundSummary = null; // summary of the round currently shown in the active row
+
+function displayWord(word) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+function openSummaryPopup(letter, summary) {
+  summaryLetterEl.textContent = `Letter ${letter}`;
+  summaryGrid.innerHTML = '';
+  for (const category of CATEGORIES) {
+    const col = document.createElement('div');
+    col.className = 'summary-col';
+    const title = document.createElement('h4');
+    title.textContent = displayWord(category);
+    col.appendChild(title);
+
+    const list = document.createElement('ol');
+    const entries = (summary && summary[category]) || [];
+    if (entries.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'summary-empty';
+      li.textContent = '—';
+      list.appendChild(li);
+    }
+    for (const entry of entries) {
+      const li = document.createElement('li');
+      const wordSpan = document.createElement('span');
+      // Other players' raw text — always textContent, never innerHTML.
+      wordSpan.className = `summary-word ${entry.valid ? 'valid' : 'invalid'}`;
+      wordSpan.textContent = displayWord(entry.word);
+      const countSpan = document.createElement('span');
+      countSpan.className = 'summary-count';
+      countSpan.textContent = `x${entry.count}`;
+      li.appendChild(wordSpan);
+      li.appendChild(countSpan);
+      list.appendChild(li);
+    }
+    col.appendChild(list);
+    summaryGrid.appendChild(col);
+  }
+  summaryPopup.classList.remove('hidden');
+}
+
+function closeSummaryPopup() {
+  summaryPopup.classList.add('hidden');
+}
+
+summaryClose.addEventListener('click', closeSummaryPopup);
+summaryContinue.addEventListener('click', closeSummaryPopup);
+summaryBackdrop.addEventListener('click', closeSummaryPopup);
+
+activeMagnifier.addEventListener('click', () => {
+  if (lastRoundSummary) openSummaryPopup(currentLetterEl.textContent, lastRoundSummary);
+});
+
+function makeMagnifierButton(letter, summary) {
+  const button = document.createElement('button');
+  button.className = 'magnifier-button';
+  button.setAttribute('aria-label', 'Round summary');
+  button.textContent = '🔍';
+  button.addEventListener('click', () => openSummaryPopup(letter, summary));
+  return button;
+}
+
 function pushHistoryRow() {
   const row = document.createElement('div');
   row.className = 'row round-row';
 
   const letterDiv = document.createElement('div');
   letterDiv.className = 'letter-cell';
-  letterDiv.textContent = currentLetterEl.textContent;
+  const letterSpan = document.createElement('span');
+  letterSpan.textContent = currentLetterEl.textContent;
+  letterDiv.appendChild(letterSpan);
+  if (lastRoundSummary) {
+    // Each history row keeps its own snapshot, openable any time.
+    letterDiv.appendChild(makeMagnifierButton(currentLetterEl.textContent, lastRoundSummary));
+  }
   row.appendChild(letterDiv);
 
   for (const category of CATEGORIES) {
@@ -287,6 +366,8 @@ function enterAnsweringPhase(state) {
     pushHistoryRow();
     resultsShown = false;
   }
+  lastRoundSummary = null;
+  activeMagnifier.classList.add('hidden');
   currentLetterEl.textContent = state.letter;
   activeRow.classList.add('answering');
   for (const category of CATEGORIES) {
@@ -393,8 +474,12 @@ socket.on('round:start', (state) => {
   showScreen('game');
 });
 
-socket.on('round:results', ({ results, phaseEndsAt, serverNow }) => {
+socket.on('round:results', ({ results, summary, phaseEndsAt, serverNow }) => {
   showResults(results);
+  if (summary) {
+    lastRoundSummary = summary;
+    activeMagnifier.classList.remove('hidden');
+  }
   startCountdown(localPhaseEnd({ phaseEndsAt, serverNow }));
 });
 

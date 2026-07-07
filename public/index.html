@@ -113,7 +113,10 @@
         <div id="history"></div>
 
         <div class="row round-row active-row" id="active-row">
-          <div class="letter-cell" id="current-letter">-</div>
+          <div class="letter-cell">
+            <span id="current-letter">-</span>
+            <button id="active-magnifier" class="magnifier-button hidden" aria-label="Round summary">🔍</button>
+          </div>
           <div class="cell">
             <input type="text" maxlength="40" autocomplete="off" />
             <span class="cell-text hidden"></span>
@@ -159,6 +162,16 @@
           <ol id="nation-leaderboard"></ol>
         </div>
       </aside>
+
+      <div id="summary-popup" class="hidden">
+        <div id="summary-backdrop"></div>
+        <div class="note summary-note">
+          <button id="summary-close" aria-label="Close">✕</button>
+          <h3 id="summary-letter">Letter -</h3>
+          <div id="summary-grid"></div>
+          <button id="summary-continue">Continue</button>
+        </div>
+      </div>
     </div>
   </div>
 

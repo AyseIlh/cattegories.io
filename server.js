@@ -129,12 +129,19 @@ function scoreRound(room) {
 
   const normLetter = normalize(room.currentLetter);
 
+  // Display summary for the magnifier popup: EVERYTHING typed (invalid too),
+  // grouped and counted. Bounded to top 10 per category regardless of player count.
+  const summary = {};
+
   for (const category of CATEGORIES) {
-    const groups = new Map(); // normalized answer -> [socketIds]
+    const groups = new Map(); // normalized valid answer -> [socketIds]
+    const counts = new Map(); // normalized answer (any) -> occurrences
     for (const [id, ans] of room.answers.entries()) {
       const raw = ans[category];
       const norm = normalize(raw);
-      if (!norm || norm[0] !== normLetter) continue;
+      if (!norm) continue;
+      counts.set(norm, (counts.get(norm) || 0) + 1);
+      if (norm[0] !== normLetter) continue;
       if (!WORD_LISTS[category].has(norm)) continue;
       if (!groups.has(norm)) groups.set(norm, []);
       groups.get(norm).push(id);
@@ -147,6 +154,10 @@ function scoreRound(room) {
         r.total += pts;
       }
     }
+    summary[category] = [...counts.entries()]
+      .map(([word, count]) => ({ word, count, valid: groups.has(word) }))
+      .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+      .slice(0, 10);
   }
 
   // Apply to player + nation totals
@@ -159,7 +170,7 @@ function scoreRound(room) {
     }
   }
 
-  return results;
+  return { results, summary };
 }
 
 function startAnswerPhase(room) {
@@ -173,12 +184,13 @@ function startAnswerPhase(room) {
 }
 
 function endAnswerPhase(room) {
-  const results = scoreRound(room);
+  const { results, summary } = scoreRound(room);
   room.phase = 'results';
   room.phaseEndsAt = Date.now() + RESULT_PHASE_MS;
   io.to(room.id).emit('round:results', {
     letter: room.currentLetter,
     results: Object.fromEntries(results),
+    summary,
     phaseEndsAt: room.phaseEndsAt,
     serverNow: Date.now(),
   });
