@@ -46,7 +46,356 @@ body {
   display: none !important;
 }
 
-/* ---------- Join screen ---------- */
+/* ---------- Landing screen ---------- */
+
+#landing-screen {
+  padding: 0;
+}
+
+.paper.landing-paper {
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  padding: 24px;
+  --row-h: 44px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--row-h) - 1.5px),
+    var(--ruled-line) calc(var(--row-h) - 1.5px),
+    var(--ruled-line) var(--row-h)
+  );
+}
+
+.landing-title {
+  margin: 0;
+  font-family: var(--hand-font);
+  font-size: clamp(52px, 11vw, 96px);
+  font-weight: 700;
+  color: var(--ink);
+  transform: rotate(-1.5deg);
+  text-shadow: 2px 2px 0 rgba(90, 80, 60, 0.12);
+}
+
+.landing-title .tld {
+  color: var(--letter-red);
+}
+
+/* Square sticky note, bottom-right corner curling like the reference photo */
+.note.landing-note {
+  width: min(300px, 78vw);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 24px 28px 28px 24px;
+  transform: rotate(1.2deg);
+  background:
+    /* soft light falling from the top-left */
+    linear-gradient(115deg, rgba(255, 255, 255, 0.35) 0%, transparent 45%),
+    /* diagonal bend shading toward the curling bottom-right corner */
+    linear-gradient(to bottom right,
+      transparent 52%,
+      rgba(150, 132, 62, 0.18) 76%,
+      rgba(150, 132, 62, 0.04) 90%,
+      rgba(255, 255, 255, 0.25) 100%),
+    #f7efa3;
+  /* wide shallow curve: the bottom-right corner bends away from the page */
+  border-bottom-right-radius: 95px 26px;
+  /* tight, close shadow hugging the bottom-right; darker so the corner reads as lifted */
+  box-shadow:
+    0 2px 3px rgba(90, 80, 60, 0.14),
+    10px 14px 10px -3px rgba(60, 50, 30, 0.55);
+}
+
+.landing-note p {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--ink);
+  text-align: center;
+}
+
+/* Classic two-tone ink eraser (red pencil end + blue ink end, cream band) */
+.eraser-button {
+  position: relative;
+  width: 264px;
+  height: 82px;
+  margin-top: 10px;
+  padding: 0 0 16px;
+  border: none;
+  border-radius: 18px / 26px;
+  background: linear-gradient(90deg, #d6552b 0 60%, #7594ba 60% 100%);
+  color: #fdf4e4;
+  font-size: 27px;
+  letter-spacing: 1px;
+  transform: rotate(-2deg);
+  text-shadow: 0 1px 2px rgba(70, 40, 30, 0.4);
+  box-shadow:
+    inset 0 -16px 0 rgba(50, 30, 25, 0.22),
+    inset 0 3px 0 rgba(255, 255, 255, 0.28),
+    inset -3px 0 4px rgba(255, 255, 255, 0.15),
+    7px 13px 14px rgba(90, 80, 60, 0.4);
+}
+
+/* Cream band running along the eraser's side, like the real thing */
+.eraser-button::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 13px;
+  height: 4px;
+  border-radius: 2px;
+  background: #f1e4bd;
+  box-shadow: 0 1px 1px rgba(50, 30, 25, 0.25);
+}
+
+.eraser-button:hover {
+  background: linear-gradient(90deg, #d6552b 0 60%, #7594ba 60% 100%);
+  transform: rotate(-2deg) translateY(3px);
+  box-shadow:
+    inset 0 -14px 0 rgba(50, 30, 25, 0.22),
+    inset 0 3px 0 rgba(255, 255, 255, 0.28),
+    inset -3px 0 4px rgba(255, 255, 255, 0.15),
+    3px 6px 8px rgba(90, 80, 60, 0.35);
+}
+
+/* ---------- "Erase the screen" transition ---------- */
+
+#landing-screen.erasing .eraser-button {
+  z-index: 6;
+  animation: erase-sweep 1.3s ease-in-out forwards;
+  pointer-events: none;
+}
+
+/* Zigzag sweep tracking the real element positions (set as CSS vars on click):
+   12-30% wipes the title row, 30-84% works down the note, then settles back. */
+@keyframes erase-sweep {
+  0%   { transform: rotate(-2deg); }
+  12%  { transform: translate(var(--sw-left, -30vw), var(--ty-title, -52vh)) rotate(-12deg) scale(1.05); }
+  30%  { transform: translate(var(--sw-right, 30vw), var(--ty-title, -52vh)) rotate(6deg) scale(1.05); }
+  44%  { transform: translate(var(--sw-left, -30vw), var(--ty-note1, -34vh)) rotate(-8deg) scale(1.05); }
+  58%  { transform: translate(var(--sw-right, 30vw), var(--ty-note2, -24vh)) rotate(6deg) scale(1.05); }
+  72%  { transform: translate(var(--sw-left, -30vw), var(--ty-note3, -14vh)) rotate(-8deg) scale(1.05); }
+  84%  { transform: translate(var(--sw-right, 30vw), var(--ty-note4, -4vh)) rotate(6deg) scale(1.05); }
+  100% { transform: rotate(-2deg); }
+}
+
+/* Title is wiped left-to-right, tracking the eraser's first pass (12%-30% of the sweep) */
+#landing-screen.erasing .landing-title {
+  animation: wipe-title 0.24s linear 0.16s forwards;
+}
+
+/* Note is wiped top-to-bottom while the eraser zigzags down the page (30%-84% of the sweep) */
+#landing-screen.erasing .note.landing-note {
+  animation: wipe-note 0.7s linear 0.39s forwards;
+}
+
+/* Negative insets keep text-shadow/box-shadow inside the clip so nothing lingers */
+@keyframes wipe-title {
+  from { clip-path: inset(-20px -20px -20px -20px); opacity: 1; }
+  to   { clip-path: inset(-20px -20px -20px calc(100% + 20px)); opacity: 0; }
+}
+
+@keyframes wipe-note {
+  from { clip-path: inset(-40px -50px -50px -50px); opacity: 1; }
+  to   { clip-path: inset(calc(100% + 50px) -50px -50px -50px); opacity: 0; }
+}
+
+/* Fit the landing on short screens without scrolling */
+@media (max-height: 620px) {
+  .paper.landing-paper {
+    gap: 16px;
+    --row-h: 36px;
+  }
+
+  .landing-title {
+    font-size: clamp(36px, 8vw, 56px);
+  }
+
+  .note.landing-note {
+    width: min(220px, 66vw);
+    padding: 14px;
+  }
+
+  .landing-note p {
+    font-size: 14px;
+  }
+
+  .eraser-button {
+    width: 200px;
+    height: 64px;
+    font-size: 22px;
+    padding-bottom: 12px;
+  }
+
+  .eraser-button::after {
+    bottom: 10px;
+    height: 3px;
+  }
+}
+
+/* ---------- Post-it screens (join / mode / waiting, on lined paper) ---------- */
+
+#join-screen,
+#mode-screen,
+#waiting-screen {
+  padding: 0;
+  overflow: hidden; /* the note flies in from outside the screen */
+}
+
+/* Bigger sticky note than the landing one, same bottom-right curl */
+.note.panel-note {
+  width: min(360px, 88vw);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding: 26px 34px 34px 30px;
+  transform: rotate(-1deg);
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.35) 0%, transparent 45%),
+    linear-gradient(to bottom right,
+      transparent 52%,
+      rgba(150, 132, 62, 0.18) 76%,
+      rgba(150, 132, 62, 0.04) 90%,
+      rgba(255, 255, 255, 0.25) 100%),
+    #f7efa3;
+  border-bottom-right-radius: 95px 26px;
+  box-shadow:
+    0 2px 3px rgba(90, 80, 60, 0.14),
+    10px 14px 10px -3px rgba(60, 50, 30, 0.55);
+  /* replays every time the screen becomes visible: flies in from outside and sticks */
+  animation: slap-in 0.2s cubic-bezier(0.25, 1, 0.4, 1) both;
+}
+
+/* Slapped onto the page from outside the screen: big while "in the air",
+   lands flat — no bounce */
+@keyframes slap-in {
+  0%   { transform: translate(70vw, -75vh) rotate(14deg) scale(1.8); }
+  100% { transform: translate(0, 0) rotate(-1deg) scale(1); }
+}
+
+.panel-note-title {
+  margin: 0 0 6px;
+  font-family: var(--hand-font);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.panel-note label {
+  color: #8a7f5f;
+}
+
+/* Inputs sit on the post-it: darker ruled underline, warm focus tint */
+.panel-note input[type="text"],
+.panel-note select {
+  border-bottom-color: rgba(90, 80, 45, 0.4);
+}
+
+.panel-note input[type="text"]:focus,
+.panel-note select:focus {
+  border-bottom-color: var(--letter-red);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.panel-note .room-error {
+  color: var(--letter-red);
+}
+
+/* Stubby, well-used yellow pencil with "ok" on the barrel */
+.pencil-button {
+  position: relative;
+  align-self: center;
+  width: 150px;
+  height: 44px;
+  margin: 30px 40px 8px 34px; /* room for eraser (left) + sharpened tip (right) */
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  /* hex-barrel shading: highlight ridge down the middle, darker facets top & bottom */
+  background: linear-gradient(
+    to bottom,
+    #d98f1e 0 14%,
+    #f2b23a 14% 34%,
+    #ffd873 34% 52%,
+    #f2ac30 52% 74%,
+    #cf8517 74% 100%
+  );
+  color: #4a3410;
+  font-family: var(--hand-font);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  transform: rotate(-3deg);
+  filter: drop-shadow(4px 6px 5px rgba(80, 60, 30, 0.4));
+}
+
+.pencil-button span {
+  position: relative;
+  top: -1px;
+}
+
+/* Eraser + metal ferrule on the left end */
+.pencil-button::before {
+  content: '';
+  position: absolute;
+  left: -40px;
+  top: 0;
+  bottom: 0;
+  width: 42px;
+  border-top-left-radius: 10px 22px;
+  border-bottom-left-radius: 10px 22px;
+  background: linear-gradient(
+    90deg,
+    #e79ab0 0 42%,               /* pink eraser */
+    #d98aa2 42% 46%,
+    #c4c7cc 47% 58%,             /* ferrule shine */
+    #82868c 58% 63%,             /* dark band */
+    #c4c7cc 63% 74%,
+    #82868c 74% 79%,             /* dark band */
+    #c4c7cc 79% 100%
+  );
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -7px 6px rgba(60, 30, 40, 0.28);
+}
+
+/* Sharpened wooden tip with graphite point on the right end */
+.pencil-button::after {
+  content: '';
+  position: absolute;
+  right: -34px;
+  top: 0;
+  bottom: 0;
+  width: 34px;
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+  background: linear-gradient(
+    90deg,
+    #e9c99a 0 55%,               /* bare wood cone */
+    #caa877 55% 70%,
+    #6b6b6b 70% 86%,             /* graphite */
+    #2f2f2f 86% 100%             /* dark point */
+  );
+}
+
+.pencil-button:hover {
+  /* re-declare the barrel gradient: the generic button:hover background
+     (flat highlight color) must never repaint the wooden body */
+  background: linear-gradient(
+    to bottom,
+    #d98f1e 0 14%,
+    #f2b23a 14% 34%,
+    #ffd873 34% 52%,
+    #f2ac30 52% 74%,
+    #cf8517 74% 100%
+  );
+  filter: drop-shadow(2px 3px 3px rgba(80, 60, 30, 0.35));
+  transform: rotate(-3deg) translateY(2px);
+}
+
+/* ---------- Card-based screens (mode / waiting) ---------- */
 
 .card {
   background: var(--paper);
@@ -101,6 +450,17 @@ input::placeholder {
   color: var(--ink-faint);
 }
 
+/* Safari/WebKit shows a contacts-autofill (person) icon on fields it guesses
+   are name/address inputs; hide it — answers here are game words, not contacts */
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
 button {
   width: 100%;
   margin-top: 24px;
@@ -129,12 +489,16 @@ button:hover {
   margin-top: 12px;
 }
 
+#mode-screen button {
+  margin-top: 12px;
+}
+
 #mode-screen button + .subtitle {
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 #mode-screen .subtitle {
-  margin-bottom: 20px;
+  margin-bottom: 6px;
 }
 
 #room-code-display {
@@ -167,10 +531,11 @@ button:hover {
   margin-bottom: 24px;
 }
 
-#waiting-screen .note {
+/* Inner players list note, sitting on the big panel note */
+#waiting-screen .panel-note .note {
   margin-top: 8px;
   margin-bottom: 8px;
-  transform: none;
+  transform: rotate(-0.8deg);
 }
 
 #waiting-hint {
@@ -215,6 +580,20 @@ button:hover {
   opacity: 0.5;
 }
 
+/* Game sheet: the red margin line sits further right, and the Letter
+   column lives inside the margin (left of the line) — no punch holes. */
+#game-screen {
+  --game-margin-x: clamp(60px, 10vw, 88px);
+}
+
+#game-screen .paper::before {
+  left: var(--game-margin-x);
+}
+
+#game-screen .paper::after {
+  left: calc(var(--game-margin-x) + 4px);
+}
+
 .hole {
   position: absolute;
   left: 12px;
@@ -234,7 +613,7 @@ button:hover {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 14px 20px 4px calc(clamp(36px, 6.5%, 52px) + 16px);
+  padding: 14px 20px 4px calc(var(--game-margin-x) + 16px);
   font-family: var(--hand-font);
 }
 
@@ -253,9 +632,9 @@ button:hover {
 
 .row {
   display: grid;
-  grid-template-columns: clamp(28px, 6vw, 44px) repeat(6, 1fr) clamp(38px, 7vw, 54px);
+  grid-template-columns: calc(var(--game-margin-x) + 6px) repeat(6, 1fr) clamp(38px, 7vw, 54px);
   align-items: end;
-  padding: 0 16px 0 calc(clamp(36px, 6.5%, 52px) + 16px);
+  padding: 0 16px 0 0;
 }
 
 .labels-row {
@@ -269,7 +648,7 @@ button:hover {
 }
 
 .labels-row > div:first-child {
-  text-align: left;
+  text-align: center;
 }
 
 .labels-row .score-label {
@@ -286,6 +665,12 @@ button:hover {
 
 .round-row > * + * {
   border-left: 1px solid var(--cell-line);
+}
+
+/* The red margin line already separates Letter from Name — skip the
+   gray cell line that would double it. */
+.round-row > :nth-child(2) {
+  border-left-color: transparent;
 }
 
 #fillers {
@@ -305,6 +690,7 @@ button:hover {
   font-size: clamp(18px, 3.4vw, 26px);
   color: var(--letter-red);
   padding-bottom: 1px;
+  text-align: center;
 }
 
 .cell {
@@ -339,9 +725,55 @@ button:hover {
   padding-bottom: 2px;
 }
 
+/* Highlighter marks over finished answers: an ::after overlay with
+   mix-blend-mode: multiply, so the ink stays readable under the color. */
+.cell-text.correct,
 .cell-text.invalid {
-  text-decoration: line-through wavy var(--invalid-strike);
-  color: var(--invalid-text);
+  position: relative;
+  /* The marker stroke runs 5px past the word on both sides. Padding (not a
+     negative ::after offset) so the span's own overflow:hidden can't clip it;
+     the negative margin cancels the layout shift. */
+  padding: 0 5px;
+  margin: 0 -5px;
+  /* max-width: 100% is border-box here, so it would eat the 5px overhang
+     in a tight cell — widen the cap by the added padding. */
+  max-width: calc(100% + 10px);
+}
+
+.cell-text.correct::after,
+.cell-text.invalid::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6%;
+  bottom: 2%;
+  mix-blend-mode: multiply;
+  border-radius: 8px 12px 10px 14px / 14px 8px 12px 9px;
+  transform: rotate(-0.7deg);
+  pointer-events: none;
+}
+
+.cell-text.correct::after {
+  background: linear-gradient(
+    97deg,
+    rgba(148, 227, 66, 0.45) 0%,
+    rgba(132, 220, 48, 0.72) 10%,
+    rgba(145, 226, 60, 0.6) 45%,
+    rgba(130, 218, 46, 0.7) 82%,
+    rgba(150, 228, 70, 0.4) 100%
+  );
+}
+
+.cell-text.invalid::after {
+  background: linear-gradient(
+    97deg,
+    rgba(255, 96, 110, 0.42) 0%,
+    rgba(255, 74, 92, 0.68) 10%,
+    rgba(255, 90, 104, 0.56) 45%,
+    rgba(255, 70, 90, 0.66) 82%,
+    rgba(255, 100, 115, 0.38) 100%
+  );
 }
 
 .cell-text.empty {
@@ -372,7 +804,7 @@ button:hover {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 4px 12px;
-  padding: 10px 250px 0 calc(clamp(36px, 6.5%, 52px) + 16px);
+  padding: 10px 250px 0 calc(var(--game-margin-x) + 16px);
   font-size: clamp(12px, 2vw, 15px);
   color: var(--label);
 }
@@ -453,9 +885,8 @@ button:hover {
   }
 
   .paper-header,
-  .row,
   .paper-footer {
-    padding-left: 40px;
+    padding-left: calc(var(--game-margin-x) + 10px);
   }
 
   .hole {

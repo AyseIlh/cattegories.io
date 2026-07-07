@@ -4,6 +4,7 @@ const CATEGORIES = ['name', 'city', 'animal', 'plant', 'food', 'object'];
 const MAX_HISTORY = 30;
 
 const screens = {
+  landing: document.getElementById('landing-screen'),
   join: document.getElementById('join-screen'),
   mode: document.getElementById('mode-screen'),
   waiting: document.getElementById('waiting-screen'),
@@ -14,6 +15,11 @@ function showScreen(name) {
   for (const key of Object.keys(screens)) {
     screens[key].classList.toggle('hidden', key !== name);
   }
+  // A focus() during an entry animation can scroll the container sideways;
+  // always land on a screen with its scroll reset.
+  screens[name].scrollLeft = 0;
+  screens[name].scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 const nicknameInput = document.getElementById('nickname-input');
@@ -80,6 +86,40 @@ for (const [code, name] of COUNTRIES) {
 }
 countrySelect.value = 'TR';
 
+let landingErasing = false;
+const landingPlayButton = document.getElementById('landing-play-button');
+landingPlayButton.addEventListener('click', () => {
+  if (landingErasing) return;
+  landingErasing = true;
+
+  // Measure where the title and note actually are, so the eraser's sweep
+  // passes exactly over them on any screen size.
+  const eraserRect = landingPlayButton.getBoundingClientRect();
+  const titleRect = document.querySelector('.landing-title').getBoundingClientRect();
+  const noteRect = document.querySelector('.landing-note').getBoundingClientRect();
+  const ex = eraserRect.left + eraserRect.width / 2;
+  const ey = eraserRect.top + eraserRect.height / 2;
+  const margin = Math.min(120, window.innerWidth * 0.18);
+  const s = screens.landing.style;
+  s.setProperty('--sw-left', `${-(ex - margin)}px`);
+  s.setProperty('--sw-right', `${window.innerWidth - ex - margin}px`);
+  s.setProperty('--ty-title', `${titleRect.top + titleRect.height / 2 - ey}px`);
+  s.setProperty('--ty-note1', `${noteRect.top + noteRect.height * 0.15 - ey}px`);
+  s.setProperty('--ty-note2', `${noteRect.top + noteRect.height * 0.45 - ey}px`);
+  s.setProperty('--ty-note3', `${noteRect.top + noteRect.height * 0.75 - ey}px`);
+  s.setProperty('--ty-note4', `${noteRect.bottom - ey}px`);
+
+  screens.landing.classList.add('erasing');
+  setTimeout(() => {
+    screens.landing.classList.remove('erasing');
+    landingErasing = false;
+    showScreen('join');
+    // preventScroll: the note is still flying in; a normal focus() would
+    // scroll the screen toward its mid-flight position and leave it stuck there.
+    nicknameInput.focus({ preventScroll: true });
+  }, 1450);
+});
+
 function clearRoomError() {
   roomErrorEl.classList.add('hidden');
   roomErrorFallbacks.classList.add('hidden');
@@ -88,7 +128,7 @@ function clearRoomError() {
 continueButton.addEventListener('click', () => {
   const nickname = nicknameInput.value.trim();
   if (!nickname) {
-    nicknameInput.focus();
+    nicknameInput.focus({ preventScroll: true });
     return;
   }
   myNickname = nickname;
@@ -113,7 +153,7 @@ playPrivateButton.addEventListener('click', () => {
 joinCodeButton.addEventListener('click', () => {
   joinCodeArea.classList.toggle('hidden');
   if (!joinCodeArea.classList.contains('hidden')) {
-    roomCodeInput.focus();
+    roomCodeInput.focus({ preventScroll: true });
   }
 });
 
@@ -122,7 +162,7 @@ function submitRoomCode() {
   if (code.length !== 4) {
     codeErrorEl.textContent = 'The room code is 4 characters long.';
     codeErrorEl.classList.remove('hidden');
-    roomCodeInput.focus();
+    roomCodeInput.focus({ preventScroll: true });
     return;
   }
   codeErrorEl.classList.add('hidden');
@@ -226,7 +266,7 @@ function enterAnsweringPhase(state) {
     categoryInputs[category].disabled = false;
     categoryInputs[category].classList.remove('hidden');
     categoryTexts[category].classList.add('hidden');
-    categoryTexts[category].classList.remove('invalid', 'empty');
+    categoryTexts[category].classList.remove('invalid', 'correct', 'empty');
   }
   activeScore.textContent = '?';
   activeScore.classList.add('pending');
@@ -250,7 +290,7 @@ function showResults(results) {
       span.classList.add('empty');
     } else {
       span.textContent = raw;
-      if (points === 0) span.classList.add('invalid');
+      span.classList.add(points === 0 ? 'invalid' : 'correct');
     }
     categoryInputs[category].classList.add('hidden');
     categoryInputs[category].disabled = true;
@@ -284,7 +324,7 @@ socket.on('room:error', ({ message }) => {
     // Error came from the "join with a code" path — show it inline next to the code input.
     codeErrorEl.textContent = message;
     codeErrorEl.classList.remove('hidden');
-    roomCodeInput.focus();
+    roomCodeInput.focus({ preventScroll: true });
     return;
   }
   roomErrorEl.textContent = message;
