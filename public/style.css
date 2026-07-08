@@ -584,21 +584,6 @@ button:hover {
   --game-margin-x: clamp(60px, 10vw, 88px);
 }
 
-:root {
-  /* Reserved bottom band on the game sheet: ~4 ruled rows kept clear for
-     future ads/fixed elements. Also used as scroll padding so the active
-     row is never pulled underneath it. */
-  --ad-band-h: calc(4 * clamp(34px, 4.5vh, 44px));
-}
-
-html {
-  scroll-padding-bottom: calc(var(--ad-band-h) + 6px);
-}
-
-#game-screen .paper {
-  padding-bottom: 0; /* the band is the page's last element; no strip below it */
-}
-
 #game-screen .paper::before {
   left: var(--game-margin-x);
 }
@@ -649,46 +634,6 @@ html {
 }
 
 .sheet-top::after {
-  left: calc(var(--game-margin-x) + 4px);
-  opacity: 0.5;
-}
-
-/* Bottom counterpart of .sheet-top: pinned to the viewport bottom, rows
-   scroll underneath. Drawn as blank ruled paper until ads move in. */
-.sheet-bottom {
-  position: sticky;
-  bottom: 0;
-  z-index: 4; /* above rows, below the fixed sidebar post-its */
-  height: var(--ad-band-h);
-  flex-shrink: 0;
-  --row-h: clamp(34px, 4.5vh, 44px);
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      transparent 0,
-      transparent calc(var(--row-h) - 1.5px),
-      var(--ruled-line) calc(var(--row-h) - 1.5px),
-      var(--ruled-line) var(--row-h)
-    ),
-    var(--paper);
-  box-shadow: 0 -2px 5px rgba(90, 80, 60, 0.12);
-}
-
-.sheet-bottom::before,
-.sheet-bottom::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1.5px;
-  background: var(--margin-red);
-}
-
-.sheet-bottom::before {
-  left: var(--game-margin-x);
-}
-
-.sheet-bottom::after {
   left: calc(var(--game-margin-x) + 4px);
   opacity: 0.5;
 }
