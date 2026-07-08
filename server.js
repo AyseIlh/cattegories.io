@@ -14,7 +14,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const CATEGORIES = ['name', 'city', 'animal', 'plant', 'food', 'object'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
-const ANSWER_PHASE_MS = 60 * 1000;
+const ANSWER_PHASE_MS = 5 * 1000; // TEST MODE: normally 60 * 1000 — restore before deploy
 const RESULT_PHASE_MS = 8 * 1000;
 const LETTER_COOLDOWN = 15; // a drawn letter can't repeat for this many rounds
 
