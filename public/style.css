@@ -702,8 +702,8 @@ button:hover {
   border-left-color: transparent;
 }
 
-#fillers {
-  flex: 1;
+#fillers,
+#page-tail {
   --row-h: clamp(34px, 4.5vh, 44px);
   background: repeating-linear-gradient(
     to bottom,
@@ -712,6 +712,22 @@ button:hover {
     var(--ruled-line) calc(var(--row-h) - 1.5px),
     var(--ruled-line) var(--row-h)
   );
+}
+
+#fillers {
+  flex: 1;
+}
+
+/* The page's clean side: zero until row 17 is played, then exactly 14
+   blank ruled rows kept below the newest round — the page simply grows,
+   so the "division" is invisible (same rhythm, no seam). */
+#page-tail {
+  height: 0;
+  flex-shrink: 0;
+}
+
+.paper.page-extended #page-tail {
+  height: calc(14 * var(--row-h));
 }
 
 .letter-cell {

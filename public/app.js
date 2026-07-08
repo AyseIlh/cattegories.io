@@ -2,6 +2,7 @@ const socket = io();
 
 const CATEGORIES = ['name', 'city', 'animal', 'plant', 'food', 'object'];
 const MAX_HISTORY = 100;
+const SCROLL_UNLOCK_ROW = 17; // from this row on, the page's clean side opens up below
 
 const screens = {
   landing: document.getElementById('landing-screen'),
@@ -368,6 +369,9 @@ function enterAnsweringPhase(state) {
   }
   lastRoundSummary = null;
   activeMagnifier.classList.add('hidden');
+  // history rows + the active row = current row number on the page
+  const gamePaper = screens.game.querySelector('.paper');
+  gamePaper.classList.toggle('page-extended', historyEl.children.length + 1 >= SCROLL_UNLOCK_ROW);
   currentLetterEl.textContent = state.letter;
   activeRow.classList.add('answering');
   for (const category of CATEGORIES) {
@@ -380,8 +384,9 @@ function enterAnsweringPhase(state) {
   activeScore.textContent = '?';
   activeScore.classList.add('pending');
   phaseHint.textContent = '';
-  categoryInputs.name.focus();
-  activeRow.scrollIntoView({ block: 'nearest' });
+  // preventScroll: the player parks the page wherever they like; a new
+  // round must never move their scroll position.
+  categoryInputs.name.focus({ preventScroll: true });
   startCountdown(localPhaseEnd(state));
 }
 
