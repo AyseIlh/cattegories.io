@@ -1,7 +1,7 @@
 const socket = io();
 
 const CATEGORIES = ['name', 'city', 'animal', 'plant', 'food', 'object'];
-const MAX_HISTORY = 30;
+const MAX_HISTORY = 100;
 
 const screens = {
   landing: document.getElementById('landing-screen'),

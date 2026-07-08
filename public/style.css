@@ -607,6 +607,37 @@ button:hover {
 .hole-2 { top: 50%; }
 .hole-3 { top: 85%; }
 
+/* Sticky band: banner + column labels stay put while the sheet scrolls
+   underneath (inert until the page actually overflows). */
+.sheet-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--paper);
+  box-shadow: 0 2px 5px rgba(90, 80, 60, 0.12);
+}
+
+/* The paper's red margin double-line sits behind the sticky band; redraw
+   the same two lines on the band so the line runs unbroken while scrolled. */
+.sheet-top::before,
+.sheet-top::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--margin-red);
+}
+
+.sheet-top::before {
+  left: var(--game-margin-x);
+}
+
+.sheet-top::after {
+  left: calc(var(--game-margin-x) + 4px);
+  opacity: 0.5;
+}
+
 .paper-header {
   display: flex;
   align-items: baseline;
