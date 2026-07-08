@@ -16,6 +16,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'
 
 const ANSWER_PHASE_MS = 60 * 1000;
 const RESULT_PHASE_MS = 8 * 1000;
+const LETTER_COOLDOWN = 15; // a drawn letter can't repeat for this many rounds
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // excludes 0/O/1/I/L (ambiguous in the handwritten UI font)
 const ROOM_CODE_LENGTH = 4;
@@ -59,6 +60,7 @@ function createRoom({ id, type, hostId = null }) {
     players: new Map(),
     nationScores: new Map(),
     currentLetter: null,
+    recentLetters: [], // last LETTER_COOLDOWN drawn letters, oldest first
     phaseEndsAt: 0,
     answers: new Map(),
     timer: null,
@@ -77,10 +79,14 @@ function getRoomForSocket(socket) {
 }
 
 function pickNextLetter(room) {
-  let letter;
-  do {
-    letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-  } while (letter === room.currentLetter && LETTERS.length > 1);
+  // LETTER_COOLDOWN (15) < LETTERS.length (26), so this pool is never empty.
+  const banned = new Set(room.recentLetters);
+  const pool = LETTERS.filter((l) => !banned.has(l));
+  const letter = pool[Math.floor(Math.random() * pool.length)];
+
+  room.recentLetters.push(letter);
+  if (room.recentLetters.length > LETTER_COOLDOWN) room.recentLetters.shift();
+
   return letter;
 }
 
