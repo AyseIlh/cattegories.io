@@ -59,8 +59,6 @@ const timerEl = document.getElementById('timer');
 const historyEl = document.getElementById('history');
 const activeRow = document.getElementById('active-row');
 const activeScore = document.getElementById('active-score');
-const meLine = document.getElementById('me-line');
-const phaseHint = document.getElementById('phase-hint');
 const playerLeaderboardEl = document.getElementById('player-leaderboard');
 const nationLeaderboardEl = document.getElementById('nation-leaderboard');
 
@@ -383,7 +381,6 @@ function enterAnsweringPhase(state) {
   }
   activeScore.textContent = '?';
   activeScore.classList.add('pending');
-  phaseHint.textContent = '';
   // preventScroll: the player parks the page wherever they like; a new
   // round must never move their scroll position.
   categoryInputs.name.focus({ preventScroll: true });
@@ -414,7 +411,6 @@ function showResults(results) {
   const total = myResult ? myResult.total : 0;
   activeScore.textContent = `+${total}`;
   activeScore.classList.remove('pending');
-  phaseHint.textContent = 'Next letter coming up...';
   resultsShown = true;
 }
 
@@ -468,7 +464,6 @@ socket.on('state:sync', (state) => {
       categoryInputs[category].disabled = true;
     }
     activeRow.classList.remove('answering');
-    phaseHint.textContent = 'Next letter coming up...';
     startCountdown(localPhaseEnd(state));
     showScreen('game');
   }
@@ -507,13 +502,6 @@ socket.on('leaderboard:update', ({ players, nations }) => {
   for (const p of players) {
     playerLeaderboardEl.appendChild(leaderboardRow(`${flagEmoji(p.countryCode)} ${p.nickname}`, p.score));
     waitingPlayerList.appendChild(leaderboardRow(`${flagEmoji(p.countryCode)} ${p.nickname}`, p.score));
-  }
-
-  const me = players.find((p) => p.id === socket.id);
-  if (me) {
-    meLine.textContent = `${flagEmoji(me.countryCode)} ${me.nickname} — total ${me.score}`;
-  } else if (myNickname) {
-    meLine.textContent = `${flagEmoji(myCountry)} ${myNickname} — total 0`;
   }
 
   nationLeaderboardEl.innerHTML = '';

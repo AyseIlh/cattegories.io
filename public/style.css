@@ -582,6 +582,10 @@ button:hover {
    column lives inside the margin (left of the line) — no punch holes. */
 #game-screen {
   --game-margin-x: clamp(60px, 10vw, 88px);
+  /* Single source of truth for row height: played rows (.round-row) and
+     the blank ruled backgrounds (#fillers, #page-tail) must all use this
+     exact value, or the tail's lines drift out of sync with real rows. */
+  --row-h: clamp(34px, 4.5vh, 44px);
 }
 
 #game-screen .paper::before {
@@ -685,7 +689,7 @@ button:hover {
 }
 
 .round-row {
-  min-height: clamp(30px, 5.2vw, 38px);
+  height: var(--row-h);
   border-bottom: 1.5px solid var(--ruled-line);
   font-family: var(--hand-font);
   font-size: clamp(15px, 2.8vw, 22px);
@@ -704,7 +708,6 @@ button:hover {
 
 #fillers,
 #page-tail {
-  --row-h: clamp(34px, 4.5vh, 44px);
   background: repeating-linear-gradient(
     to bottom,
     transparent 0,
@@ -846,24 +849,6 @@ button:hover {
   background: var(--active-bg);
 }
 
-/* ---------- Footer ---------- */
-
-.paper-footer {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 10px 250px 0 calc(var(--game-margin-x) + 16px);
-  font-size: clamp(12px, 2vw, 15px);
-  color: var(--label);
-}
-
-@media (max-width: 640px) {
-  .paper-footer {
-    padding-right: 170px;
-  }
-}
-
 /* ---------- Sticky notes (pinned bottom right) ---------- */
 
 .sidebar {
@@ -933,8 +918,7 @@ button:hover {
     left: 30px;
   }
 
-  .paper-header,
-  .paper-footer {
+  .paper-header {
     padding-left: calc(var(--game-margin-x) + 10px);
   }
 
