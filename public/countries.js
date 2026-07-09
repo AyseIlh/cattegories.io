@@ -1,24 +1,22 @@
 // ISO 3166-1 alpha-2 country code -> English name. Flag emoji is auto-generated from the code.
-// Sorted alphabetically by country name. Removed: Syria, Georgia, Ethiopia, Libya, Tunisia, Nigeria, Ghana, Kenya.
+// Sorted alphabetically by country name. Core list: major economic/cultural hubs only.
 const COUNTRIES = [
   ['AM', 'Armenia'], ['AZ', 'Azerbaijan'], ['AT', 'Austria'], ['AU', 'Australia'],
-  ['BD', 'Bangladesh'], ['BE', 'Belgium'], ['BR', 'Brazil'], ['BG', 'Bulgaria'],
-  ['CA', 'Canada'], ['CL', 'Chile'], ['CN', 'China'], ['CO', 'Colombia'],
-  ['HR', 'Croatia'], ['CZ', 'Czechia'], ['DK', 'Denmark'], ['EG', 'Egypt'],
-  ['FI', 'Finland'], ['FR', 'France'], ['DE', 'Germany'], ['GR', 'Greece'],
-  ['HU', 'Hungary'], ['IN', 'India'], ['ID', 'Indonesia'], ['IR', 'Iran'],
-  ['IQ', 'Iraq'], ['IE', 'Ireland'], ['IL', 'Israel'], ['IT', 'Italy'],
-  ['JP', 'Japan'], ['JO', 'Jordan'], ['KZ', 'Kazakhstan'], ['KR', 'South Korea'],
-  ['KG', 'Kyrgyzstan'], ['KW', 'Kuwait'], ['LB', 'Lebanon'], ['MY', 'Malaysia'],
+  ['BE', 'Belgium'], ['BR', 'Brazil'], ['BG', 'Bulgaria'], ['CA', 'Canada'],
+  ['CL', 'Chile'], ['CN', 'China'], ['HR', 'Croatia'], ['CZ', 'Czechia'],
+  ['DK', 'Denmark'], ['EG', 'Egypt'], ['FI', 'Finland'], ['FR', 'France'],
+  ['DE', 'Germany'], ['GR', 'Greece'], ['HU', 'Hungary'], ['IN', 'India'],
+  ['ID', 'Indonesia'], ['IR', 'Iran'], ['IQ', 'Iraq'], ['IE', 'Ireland'],
+  ['IT', 'Italy'], ['JP', 'Japan'], ['JO', 'Jordan'], ['KZ', 'Kazakhstan'],
+  ['KR', 'South Korea'], ['KG', 'Kyrgyzstan'], ['LB', 'Lebanon'], ['MY', 'Malaysia'],
   ['MX', 'Mexico'], ['MA', 'Morocco'], ['NL', 'Netherlands'], ['NZ', 'New Zealand'],
   ['NO', 'Norway'], ['PK', 'Pakistan'], ['PE', 'Peru'], ['PH', 'Philippines'],
   ['PL', 'Poland'], ['PT', 'Portugal'], ['QA', 'Qatar'], ['RO', 'Romania'],
   ['RU', 'Russia'], ['SA', 'Saudi Arabia'], ['RS', 'Serbia'], ['SG', 'Singapore'],
   ['SK', 'Slovakia'], ['ZA', 'South Africa'], ['ES', 'Spain'], ['SE', 'Sweden'],
-  ['CH', 'Switzerland'], ['TJ', 'Tajikistan'], ['TH', 'Thailand'], ['TR', 'Turkey'],
-  ['TM', 'Turkmenistan'], ['UA', 'Ukraine'], ['AE', 'United Arab Emirates'],
-  ['GB', 'United Kingdom'], ['US', 'United States'], ['UZ', 'Uzbekistan'],
-  ['VE', 'Venezuela'], ['VN', 'Vietnam'], ['DZ', 'Algeria'],
+  ['CH', 'Switzerland'], ['TH', 'Thailand'], ['TR', 'Turkey'], ['UA', 'Ukraine'],
+  ['AE', 'United Arab Emirates'], ['GB', 'United Kingdom'], ['US', 'United States'],
+  ['DZ', 'Algeria'],
 ];
 
 function flagEmoji(countryCode) {
