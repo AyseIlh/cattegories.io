@@ -295,6 +295,10 @@ io.on('connection', (socket) => {
     broadcastLeaderboards(room);
   });
 
+  socket.on('room:leave', () => {
+    leaveCurrentRoom(socket);
+  });
+
   socket.on('room:start', () => {
     const room = getRoomForSocket(socket);
     if (!room) return;

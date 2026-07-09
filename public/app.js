@@ -98,6 +98,7 @@ socket.on('connect', () => {
   }
 });
 
+const defaultJoinSubtitle = joinSubtitle.textContent;
 const roomParam = new URLSearchParams(window.location.search).get('room');
 if (roomParam) {
   pendingRoomId = roomParam.trim().toUpperCase();
@@ -184,7 +185,15 @@ joinCodeButton.addEventListener('click', () => {
 });
 
 waitingBackButton.addEventListener('click', () => {
-  socket.disconnect();
+  // Leave the room server-side but keep the socket alive — disconnect()
+  // here would be permanent (socket.io never auto-reconnects after a
+  // manual disconnect), leaving every later join click dead in the water.
+  socket.emit('room:leave');
+  myRoomId = null;
+  amIHost = false;
+  hasJoinedOnce = false;
+  pendingRoomId = null;
+  joinSubtitle.textContent = defaultJoinSubtitle;
   showScreen('landing');
 });
 
