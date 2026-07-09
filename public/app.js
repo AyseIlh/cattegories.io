@@ -37,7 +37,6 @@ const playPrivateButton = document.getElementById('play-private-button');
 const joinCodeButton = document.getElementById('join-code-button');
 const joinCodeArea = document.getElementById('join-code-area');
 const roomCodeInput = document.getElementById('room-code-input');
-const modeBackButton = document.getElementById('mode-back-button');
 const waitingBackButton = document.getElementById('waiting-back-button');
 const codeErrorEl = document.getElementById('code-error');
 const joinCodeSubmit = document.getElementById('join-code-submit');
@@ -182,10 +181,6 @@ joinCodeButton.addEventListener('click', () => {
   if (!joinCodeArea.classList.contains('hidden')) {
     roomCodeInput.focus({ preventScroll: true });
   }
-});
-
-modeBackButton.addEventListener('click', () => {
-  showScreen('landing');
 });
 
 waitingBackButton.addEventListener('click', () => {

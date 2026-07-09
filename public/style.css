@@ -509,9 +509,9 @@ button:hover {
 }
 
 .back-button {
-  width: auto !important;
+  width: auto;
   align-self: flex-start;
-  margin-top: 0 !important;
+  margin-top: 0;
   margin-bottom: 12px;
   padding: 4px 12px;
   font-size: 14px;
