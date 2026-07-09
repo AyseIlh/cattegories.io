@@ -1,3 +1,27 @@
+@font-face {
+  font-family: 'Papernotes';
+  src: url('fonts/Papernotes.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Papernotes';
+  src: url('fonts/PapernotesBold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Magic Clover';
+  src: url('fonts/MagicClover.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -15,8 +39,11 @@
   --score-green: #4a7c2f;
   --label: #9a917d;
   --active-bg: #fff7d9;
-  --hand-font: 'Caveat', cursive;
-  --print-font: 'Patrick Hand', cursive;
+  /* Titles, static labels, buttons, and the round's drawn letter. */
+  --heading-font: 'Papernotes', 'Caveat', cursive;
+  /* Everything the player types or reads as running text/data: answers,
+     nicknames, room codes, subtitles, scores, the timer. */
+  --body-font: 'Magic Clover', 'Patrick Hand', cursive;
   /* Red margin line position: shared by every screen's paper background
      (landing/join/mode/waiting AND the game sheet), so the notebook look
      never shifts between them. */
@@ -25,7 +52,7 @@
 
 body {
   margin: 0;
-  font-family: var(--print-font), sans-serif;
+  font-family: var(--body-font), sans-serif;
   background: var(--paper);
   color: var(--ink);
   min-height: 100vh;
@@ -71,7 +98,7 @@ body {
 
 .landing-title {
   margin: 0;
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
   font-size: clamp(52px, 11vw, 96px);
   font-weight: 700;
   color: var(--ink);
@@ -281,7 +308,7 @@ body {
 
 .panel-note-title {
   margin: 0 0 6px;
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
   font-size: 30px;
   font-weight: 700;
   color: var(--ink);
@@ -327,7 +354,7 @@ body {
     #cf8517 74% 100%
   );
   color: #4a3410;
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
   font-size: 32px;
   font-weight: 700;
   letter-spacing: 3px;
@@ -410,7 +437,7 @@ body {
 
 .card h1 {
   margin: 0 0 8px;
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
   font-size: 34px;
   font-weight: 700;
   color: var(--ink);
@@ -438,7 +465,7 @@ input[type="text"], select {
   border-radius: 0;
   background: transparent;
   color: var(--ink);
-  font-family: var(--hand-font);
+  font-family: var(--body-font);
   font-size: 20px;
 }
 
@@ -471,7 +498,7 @@ button {
   border-radius: 6px;
   background: transparent;
   color: var(--ink);
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
   font-size: 22px;
   font-weight: 700;
   cursor: pointer;
@@ -625,7 +652,7 @@ button:hover {
   align-items: baseline;
   justify-content: space-between;
   padding: 14px 20px 4px calc(var(--margin-x) + 16px);
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
 }
 
 .paper-title {
@@ -634,6 +661,9 @@ button:hover {
 }
 
 .paper-timer {
+  /* A live countdown number, not a heading — reads as data/body text even
+     though it sits inside .paper-header (heading font). */
+  font-family: var(--body-font);
   font-size: clamp(18px, 3.2vw, 24px);
   color: var(--letter-red);
   font-weight: 700;
@@ -649,6 +679,7 @@ button:hover {
 }
 
 .labels-row {
+  font-family: var(--heading-font);
   font-size: clamp(11px, 1.8vw, 14px);
   color: var(--label);
   padding-bottom: 2px;
@@ -669,7 +700,7 @@ button:hover {
 .round-row {
   height: var(--row-h);
   border-bottom: 1.5px solid var(--ruled-line);
-  font-family: var(--hand-font);
+  font-family: var(--body-font);
   font-size: clamp(15px, 2.8vw, 22px);
   color: var(--ink);
 }
@@ -712,6 +743,9 @@ button:hover {
 }
 
 .letter-cell {
+  /* The round's drawn letter always uses the heading font, even though its
+     row (.round-row, typed answers) uses the body font. */
+  font-family: var(--heading-font);
   font-weight: 700;
   font-size: clamp(18px, 3.4vw, 26px);
   color: var(--letter-red);
@@ -729,7 +763,7 @@ button:hover {
   width: 100%;
   border: none;
   background: transparent;
-  font-family: var(--hand-font);
+  font-family: var(--body-font);
   font-size: inherit;
   color: var(--ink);
   text-align: center;
@@ -854,7 +888,7 @@ button:hover {
 
 .note h3 {
   margin: 0 0 6px;
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
   font-size: 22px;
   font-weight: 700;
   color: var(--ink);
@@ -978,6 +1012,7 @@ button:hover {
 
 .summary-note h3 {
   margin: 0 0 12px;
+  font-family: var(--heading-font);
   font-size: 30px;
   color: var(--letter-red);
 }
@@ -1011,7 +1046,7 @@ button:hover {
   margin: 0 0 5px;
   padding-bottom: 2px;
   border-bottom: 1.5px solid var(--ruled-line);
-  font-family: var(--hand-font);
+  font-family: var(--heading-font);
   font-size: 20px;
   font-weight: 700;
   color: var(--ink);
@@ -1030,7 +1065,7 @@ button:hover {
   gap: 6px;
   min-width: 0;
   padding: 1px 0;
-  font-family: var(--hand-font);
+  font-family: var(--body-font);
   font-size: 17px;
   color: var(--ink);
 }
