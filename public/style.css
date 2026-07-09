@@ -17,6 +17,10 @@
   --active-bg: #fff7d9;
   --hand-font: 'Caveat', cursive;
   --print-font: 'Patrick Hand', cursive;
+  /* Red margin line position: shared by every screen's paper background
+     (landing/join/mode/waiting AND the game sheet), so the notebook look
+     never shifts between them. */
+  --margin-x: clamp(60px, 10vw, 88px);
 }
 
 body {
@@ -562,7 +566,7 @@ button:hover {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: clamp(36px, 6.5%, 52px);
+  left: var(--margin-x);
   width: 1.5px;
   background: var(--margin-red);
 }
@@ -572,44 +576,18 @@ button:hover {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(clamp(36px, 6.5%, 52px) + 4px);
+  left: calc(var(--margin-x) + 4px);
   width: 1.5px;
   background: var(--margin-red);
   opacity: 0.5;
 }
 
-/* Game sheet: the red margin line sits further right, and the Letter
-   column lives inside the margin (left of the line) — no punch holes. */
 #game-screen {
-  --game-margin-x: clamp(60px, 10vw, 88px);
   /* Single source of truth for row height: played rows (.round-row) and
      the blank ruled backgrounds (#fillers, #page-tail) must all use this
      exact value, or the tail's lines drift out of sync with real rows. */
   --row-h: clamp(34px, 4.5vh, 44px);
 }
-
-#game-screen .paper::before {
-  left: var(--game-margin-x);
-}
-
-#game-screen .paper::after {
-  left: calc(var(--game-margin-x) + 4px);
-}
-
-.hole {
-  position: absolute;
-  left: 12px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--desk);
-  box-shadow: inset 1px 1px 2px #c8c3b2;
-  z-index: 2;
-}
-
-.hole-1 { top: 15%; }
-.hole-2 { top: 50%; }
-.hole-3 { top: 85%; }
 
 /* Sticky band: banner + column labels stay put while the sheet scrolls
    underneath (inert until the page actually overflows). */
@@ -634,11 +612,11 @@ button:hover {
 }
 
 .sheet-top::before {
-  left: var(--game-margin-x);
+  left: var(--margin-x);
 }
 
 .sheet-top::after {
-  left: calc(var(--game-margin-x) + 4px);
+  left: calc(var(--margin-x) + 4px);
   opacity: 0.5;
 }
 
@@ -646,7 +624,7 @@ button:hover {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 14px 20px 4px calc(var(--game-margin-x) + 16px);
+  padding: 14px 20px 4px calc(var(--margin-x) + 16px);
   font-family: var(--hand-font);
 }
 
@@ -665,7 +643,7 @@ button:hover {
 
 .row {
   display: grid;
-  grid-template-columns: calc(var(--game-margin-x) + 6px) repeat(6, 1fr) clamp(38px, 7vw, 54px);
+  grid-template-columns: calc(var(--margin-x) + 6px) repeat(6, 1fr) clamp(38px, 7vw, 54px);
   align-items: end;
   padding: 0 16px 0 0;
 }
@@ -919,13 +897,7 @@ button:hover {
   }
 
   .paper-header {
-    padding-left: calc(var(--game-margin-x) + 10px);
-  }
-
-  .hole {
-    left: 6px;
-    width: 10px;
-    height: 10px;
+    padding-left: calc(var(--margin-x) + 10px);
   }
 
   .sidebar {
