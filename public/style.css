@@ -508,6 +508,22 @@ button:hover {
   background: var(--active-bg);
 }
 
+.back-button {
+  width: auto !important;
+  align-self: flex-start;
+  margin-top: 0 !important;
+  margin-bottom: 12px;
+  padding: 4px 12px;
+  font-size: 14px;
+  background: transparent;
+  border: 1px solid var(--label);
+}
+
+.back-button:hover {
+  background: rgba(154, 145, 125, 0.08);
+  border-color: var(--ink);
+}
+
 /* ---------- Mode / waiting screens ---------- */
 
 .room-error {

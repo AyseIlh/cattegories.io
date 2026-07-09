@@ -43,6 +43,7 @@
   <div id="mode-screen" class="screen hidden">
     <main class="paper landing-paper">
       <div class="note panel-note">
+        <button id="mode-back-button" class="back-button">← Back</button>
         <h2 class="panel-note-title">How do you want to play?</h2>
         <button id="play-public-button">Play Public</button>
         <p class="subtitle">Join the live global game with everyone online right now.</p>
@@ -51,7 +52,7 @@
         <button id="join-code-button">Join with a Code</button>
         <p class="subtitle">Got a 4-letter room code from a friend? Enter it here.</p>
         <div id="join-code-area" class="hidden">
-          <input id="room-code-input" type="text" maxlength="4" placeholder="E.g. K7XM" autocomplete="off" />
+          <input id="room-code-input" type="text" maxlength="4" autocomplete="off" />
           <p class="subtitle room-error hidden" id="code-error"></p>
           <button id="join-code-submit">Join Room</button>
         </div>
