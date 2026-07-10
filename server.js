@@ -7,7 +7,10 @@ const { COUNTRIES } = require('./public/countries');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+// maxHttpBufferSize caps a single inbound message. Our largest legit message
+// is an answer:update of 6 fields x 15 chars ~= 400 bytes worst case (multi-
+// byte); 5 KB leaves ~12x headroom and blocks megabyte-sized junk payloads.
+const io = new Server(server, { maxHttpBufferSize: 5 * 1024 });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -20,6 +23,21 @@ const LETTER_COOLDOWN = 15; // a drawn letter can't repeat for this many rounds
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // excludes 0/O/1/I/L (ambiguous in the handwritten UI font)
 const ROOM_CODE_LENGTH = 4;
+
+const MAX_ANSWER_LEN = 15;      // per-category answer character cap
+const MAX_NICKNAME_LEN = 20;
+
+// ---- Abuse limits (tunable) ----
+const MAX_PRIVATE_ROOMS = 250;        // total private rooms server-wide
+const MAX_PLAYERS_PER_PRIVATE = 20;   // players in one private room
+const MAX_CONNS_PER_IP = 20;          // simultaneous sockets from one IP
+const EVENT_RATE_LIMIT = 20;          // sustained events/sec per socket
+const EVENT_RATE_BURST = 40;          // short burst allowance (bucket size)
+const JOIN_ATTEMPT_LIMIT = 5;         // room-code join tries before lockout
+const JOIN_LOCKOUT_MS = 60 * 1000;    // lockout duration after too many tries
+
+// ip -> number of live sockets (per-IP connection cap)
+const connectionsPerIp = new Map();
 
 // rooms: roomId -> Room
 // Room = { id, type: 'public'|'private', phase: 'waiting'|'answering'|'results', hostId,
@@ -38,6 +56,22 @@ function asString(value) {
 
 function normalize(str) {
   return asString(str).trim().toLowerCase();
+}
+
+// Strip control chars, zero-width/invisible chars, and bidi overrides — the
+// last let someone reshape a nickname to impersonate another player's name.
+// This is NOT profanity filtering (that's a separate, planned task); it only
+// removes characters that are invisible or actively deceptive. Built from
+// code-point ranges so the source itself stays free of invisible characters.
+const INVISIBLE_CHARS = new RegExp(
+  '[\u0000-\u001F\u007F-\u009F\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]',
+  'g',
+);
+function sanitizeNickname(str) {
+  return asString(str)
+    .replace(INVISIBLE_CHARS, '')
+    .trim()
+    .slice(0, MAX_NICKNAME_LEN);
 }
 
 function generateRoomCode() {
@@ -76,6 +110,53 @@ function destroyRoom(room) {
 
 function getRoomForSocket(socket) {
   return rooms.get(socket.data.roomId);
+}
+
+function privateRoomCount() {
+  let n = 0;
+  for (const room of rooms.values()) {
+    if (room.type === 'private') n++;
+  }
+  return n;
+}
+
+// Private rooms are capped; the public room is uncapped for now (its own cap
+// is a separate decision). A socket already in the room isn't double-counted,
+// so a reconnect to a full room the player already holds a seat in still works.
+function isRoomFull(room, socket) {
+  if (room.type !== 'private') return false;
+  if (room.players.has(socket.id)) return false;
+  return room.players.size >= MAX_PLAYERS_PER_PRIVATE;
+}
+
+// Sliding-window limiter on room-code join tries: at most JOIN_ATTEMPT_LIMIT
+// within JOIN_LOCKOUT_MS. This is what makes brute-forcing the ~923k 4-char
+// codes hopeless; combined with the per-IP connection cap, opening fresh
+// sockets to dodge it doesn't help either.
+function isJoinLockedOut(socket) {
+  const now = Date.now();
+  const attempts = (socket.data.joinAttempts || []).filter((t) => now - t < JOIN_LOCKOUT_MS);
+  if (attempts.length >= JOIN_ATTEMPT_LIMIT) {
+    socket.data.joinAttempts = attempts; // keep the window fresh so it unlocks on time
+    return true;
+  }
+  attempts.push(now);
+  socket.data.joinAttempts = attempts;
+  return false;
+}
+
+// Token bucket: capacity EVENT_RATE_BURST, refills EVENT_RATE_LIMIT tokens/sec.
+// Every inbound event costs one token; running dry means the socket is flooding
+// and gets dropped. Legit play (~7 events/sec while typing) never comes close.
+function allowEvent(socket) {
+  const now = Date.now();
+  const b = socket.data.bucket;
+  const elapsed = (now - b.last) / 1000;
+  b.tokens = Math.min(EVENT_RATE_BURST, b.tokens + elapsed * EVENT_RATE_LIMIT);
+  b.last = now;
+  if (b.tokens < 1) return false;
+  b.tokens -= 1;
+  return true;
 }
 
 function pickNextLetter(room) {
@@ -207,7 +288,7 @@ function endAnswerPhase(room) {
 function buildPlayer(nickname, countryCode) {
   const code = asString(countryCode).slice(0, 2).toUpperCase();
   return {
-    nickname: asString(nickname).trim().slice(0, 20) || 'Player',
+    nickname: sanitizeNickname(nickname) || 'Player',
     countryCode: VALID_COUNTRY_CODES.has(code) ? code : '',
     score: 0,
     connected: true,
@@ -262,11 +343,36 @@ function joinRoom(socket, room, nickname, countryCode) {
 }
 
 io.on('connection', (socket) => {
+  // Per-IP connection cap: refuse a socket once this IP already holds
+  // MAX_CONNS_PER_IP live sockets, killing the "open 5000 sockets from one
+  // box" attack. (Behind a real reverse proxy we'd read x-forwarded-for
+  // instead of handshake.address — revisit at deploy.)
+  const ip = socket.handshake.address || 'unknown';
+  const ipCount = (connectionsPerIp.get(ip) || 0) + 1;
+  connectionsPerIp.set(ip, ipCount);
+  if (ipCount > MAX_CONNS_PER_IP) {
+    connectionsPerIp.set(ip, ipCount - 1);
+    socket.disconnect(true);
+    return;
+  }
+
+  // Per-socket flood guard: every inbound event costs a token; a socket that
+  // drains its bucket is spamming and gets dropped.
+  socket.data.bucket = { tokens: EVENT_RATE_BURST, last: Date.now() };
+  socket.use((_event, next) => {
+    if (allowEvent(socket)) return next();
+    socket.disconnect(true);
+  });
+
   socket.on('player:join', (payload) => {
     const { nickname, countryCode, roomId } = payload || {};
     const room = rooms.get(asString(roomId));
     if (!room) {
       socket.emit('room:error', { message: 'Room not found.' });
+      return;
+    }
+    if (isRoomFull(room, socket)) {
+      socket.emit('room:error', { message: 'That room is full.' });
       return;
     }
     joinRoom(socket, room, nickname, countryCode);
@@ -276,6 +382,10 @@ io.on('connection', (socket) => {
 
   socket.on('room:create', (payload) => {
     const { nickname, countryCode } = payload || {};
+    if (privateRoomCount() >= MAX_PRIVATE_ROOMS) {
+      socket.emit('room:error', { message: 'The server is full right now. Please try again in a bit.' });
+      return;
+    }
     const room = createRoom({ id: generateRoomCode(), type: 'private', hostId: socket.id });
     joinRoom(socket, room, nickname, countryCode);
     socket.emit('room:created', publicState(room));
@@ -283,11 +393,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on('room:join', (payload) => {
+    if (isJoinLockedOut(socket)) {
+      socket.emit('room:error', { message: 'Too many attempts. Please wait a minute and try again.' });
+      return;
+    }
     const { roomId, nickname, countryCode } = payload || {};
     const normalizedId = asString(roomId).trim().toUpperCase();
     const room = rooms.get(normalizedId);
     if (!room) {
       socket.emit('room:error', { message: 'Room not found. It may have expired or the code is wrong.' });
+      return;
+    }
+    if (isRoomFull(room, socket)) {
+      socket.emit('room:error', { message: 'That room is full.' });
       return;
     }
     joinRoom(socket, room, nickname, countryCode);
@@ -316,7 +434,7 @@ io.on('connection', (socket) => {
     const next = { ...prev };
     for (const category of CATEGORIES) {
       if (typeof payload?.[category] === 'string') {
-        next[category] = payload[category].slice(0, 40);
+        next[category] = payload[category].slice(0, MAX_ANSWER_LEN);
       }
     }
     room.answers.set(socket.id, next);
@@ -324,6 +442,9 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     leaveCurrentRoom(socket);
+    const remaining = (connectionsPerIp.get(ip) || 1) - 1;
+    if (remaining <= 0) connectionsPerIp.delete(ip);
+    else connectionsPerIp.set(ip, remaining);
   });
 });
 
