@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const http = require('http');
 const { WORD_LISTS } = require('./wordlists');
 const { COUNTRIES } = require('./public/countries');
+const Bots = require('./bots');
 
 const app = express();
 const server = http.createServer(app);
@@ -54,8 +55,26 @@ function asString(value) {
   return typeof value === 'string' ? value : '';
 }
 
+// Answer normalization. Beyond trim+lowercase this folds input quirks that
+// were rejecting genuinely correct answers:
+//  - Turkish keyboards: dotted İ lowercases to "i" + U+0307 (combining dot),
+//    which never matches ASCII list entries; dotless ı isn't decomposable at
+//    all, so it gets an explicit map to "i".
+//  - Accented input (é, ü, ...) folds to plain ASCII via NFD + stripping
+//    combining marks (the lists are pure lowercase ASCII).
+//  - Double spaces between words ("cape  town") collapse to one.
+// Built from code-point escapes (like INVISIBLE_CHARS) so the source itself
+// stays free of invisible characters.
+const COMBINING_MARKS = new RegExp('[\\u0300-\\u036f]', 'g');
+const DOTLESS_I = new RegExp('\\u0131', 'g');
 function normalize(str) {
-  return asString(str).trim().toLowerCase();
+  return asString(str)
+    .toLowerCase()
+    .replace(DOTLESS_I, 'i')
+    .normalize('NFD')
+    .replace(COMBINING_MARKS, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Strip control chars, zero-width/invisible chars, and bidi overrides — the
@@ -171,19 +190,21 @@ function pickNextLetter(room) {
   return letter;
 }
 
-function topPlayers(room, limit = 10) {
+// Full sorted lists (not just a top 10): the client shows ranks 1-9 plus the
+// viewer's own row with its true rank, so it needs everyone's position. At
+// the current scale (dozens of players) the payload is a few KB; if the
+// public room ever grows to hundreds, switch to top-10 + a per-socket rank.
+function topPlayers(room) {
   return [...room.players.entries()]
     .filter(([, p]) => p.connected)
     .map(([id, p]) => ({ id, nickname: p.nickname, countryCode: p.countryCode, score: p.score }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
 }
 
-function topNations(room, limit = 10) {
+function topNations(room) {
   return [...room.nationScores.entries()]
     .map(([countryCode, score]) => ({ countryCode, score }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
 }
 
 function broadcastLeaderboards(room) {
@@ -203,6 +224,21 @@ function publicState(room) {
     type: room.type,
     hostId: room.hostId,
   };
+}
+
+// Evidence trail for "was this word wrongly rejected, or is it just missing
+// from the list?" — logs every rejected answer from a REAL player with the
+// reason. Bots are excluded (they make mistakes on purpose and would drown
+// the signal). raw/nickname go through JSON.stringify so stray whitespace or
+// invisible characters show up in the log instead of hiding.
+function logRejected(room, id, category, raw, norm, reason) {
+  if (Bots.isBot(id)) return;
+  const player = room.players.get(id);
+  const truncated = asString(raw).length >= MAX_ANSWER_LEN ? 'yes' : 'no';
+  console.log(
+    `[rejected] letter=${room.currentLetter} cat=${category} raw=${JSON.stringify(raw)} ` +
+    `norm=${JSON.stringify(norm)} reason=${reason} player=${JSON.stringify(player?.nickname || '?')} truncated=${truncated}`,
+  );
 }
 
 function scoreRound(room) {
@@ -228,8 +264,14 @@ function scoreRound(room) {
       const norm = normalize(raw);
       if (!norm) continue;
       counts.set(norm, (counts.get(norm) || 0) + 1);
-      if (norm[0] !== normLetter) continue;
-      if (!WORD_LISTS[category].has(norm)) continue;
+      if (norm[0] !== normLetter) {
+        logRejected(room, id, category, raw, norm, 'wrong-letter');
+        continue;
+      }
+      if (!WORD_LISTS[category].has(norm)) {
+        logRejected(room, id, category, raw, norm, 'not-in-list');
+        continue;
+      }
       if (!groups.has(norm)) groups.set(norm, []);
       groups.get(norm).push(id);
     }
@@ -268,6 +310,7 @@ function startAnswerPhase(room) {
   io.to(room.id).emit('round:start', publicState(room));
   broadcastLeaderboards(room);
   room.timer = setTimeout(() => endAnswerPhase(room), ANSWER_PHASE_MS);
+  Bots.onRoundStart(room); // no-op for private rooms
 }
 
 function endAnswerPhase(room) {
@@ -451,6 +494,16 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running: http://localhost:${PORT}`);
-  // The public room starts idle; its round loop wakes when the first player joins.
   createRoom({ id: 'public', type: 'public' });
+  // Bots seat themselves in the public room and wake its round loop; with
+  // them churning between BOT_MIN and BOT_MAX the room never idles again.
+  Bots.init({
+    getPublicRoom: () => rooms.get('public'),
+    buildPlayer,
+    broadcastLeaderboards,
+    startAnswerPhase,
+    WORD_LISTS,
+    CATEGORIES,
+    MAX_ANSWER_LEN,
+  });
 });

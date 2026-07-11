@@ -50,16 +50,26 @@
   --margin-x: clamp(60px, 10vw, 88px);
 }
 
+html {
+  /* The game sheet is wider than phone viewports (horizontal scroll model);
+     an overflowing document is exactly when mobile browsers' text autosizing
+     kicks in and would desync cell text from the row geometry. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   font-family: var(--body-font), sans-serif;
   background: var(--paper);
   color: var(--ink);
   min-height: 100vh;
+  min-height: 100dvh; /* mobile: don't jump when the URL bar collapses */
 }
 
 .screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -597,11 +607,22 @@ button:hover {
 .paper {
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--paper);
   position: relative;
   display: flex;
   flex-direction: column;
   padding: 0 0 14px;
+}
+
+/* Horizontal-scroll model for narrow screens: the sheet never squeezes below
+   660px (letter col 66 + 6 category cells x 90 + score 38 + row padding 16),
+   the document itself overflows and the WINDOW scrolls sideways. No inner
+   overflow-x container — that would become the scrollport for .sheet-top's
+   position:sticky and kill the sticky band. Scoped to the game sheet only;
+   the landing/join/mode/waiting papers must never inherit a min-width. */
+#game-screen .paper {
+  min-width: 660px;
 }
 
 .paper::before {
@@ -683,6 +704,16 @@ button:hover {
   font-size: clamp(18px, 3.2vw, 24px);
   color: var(--letter-red);
   font-weight: 700;
+}
+
+/* Mobile only: the current letter mirrored next to the timer, because with
+   the sheet scrolled right the active row's letter column is off-screen. */
+.header-letter {
+  display: none;
+  font-family: var(--heading-font);
+  font-weight: 700;
+  color: var(--letter-red);
+  margin-right: 10px;
 }
 
 /* ---------- Rows ---------- */
@@ -895,11 +926,101 @@ button:hover {
   padding: 12px 14px;
   box-shadow: 2px 3px 6px rgba(90, 80, 60, 0.25);
   transform: rotate(-1.5deg);
+  /* Above the paper's red margin lines: .paper::after comes after all
+     children in tree order, so without an explicit level the thin line
+     paints on top of the (transformed) post-its. */
+  position: relative;
+  z-index: 1;
 }
 
-.note.note-tilt {
+/* Single tabbed leaderboard post-it: yellow = Players, green = Nations
+   (the colors the old two separate notes had). */
+#leaderboard-note {
+  position: relative; /* anchors the collapse toggle to this note's corner */
+}
+
+#leaderboard-note.nations-view {
   background: #dcefd8;
   transform: rotate(1deg);
+}
+
+/* Collapse/expand: top-3 vs top-10. A single glyph that flips upside down
+   rather than swapping icons. */
+.lb-collapse {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: auto;
+  margin-top: 0;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--label);
+  transition: transform 0.15s ease;
+}
+
+.lb-collapse:hover {
+  /* the generic button:hover paints a yellow fill; this stays flat */
+  background: transparent;
+  color: var(--ink);
+}
+
+#leaderboard-note.collapsed .lb-collapse {
+  transform: rotate(180deg);
+}
+
+.lb-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding-right: 22px; /* keep tab labels clear of the collapse toggle */
+  border-bottom: 1px solid rgba(66, 65, 62, 0.25);
+}
+
+.lb-tab {
+  width: auto;
+  margin-top: 0;
+  padding: 2px 4px 4px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 18px;
+  color: var(--label);
+}
+
+.lb-tab:hover {
+  /* the generic button:hover paints a yellow fill; tabs stay flat */
+  background: transparent;
+  color: var(--ink);
+}
+
+.lb-tab.active {
+  color: var(--ink);
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: -1px; /* the underline sits on the divider */
+}
+
+#leaderboard-note ol {
+  list-style: none;
+  padding-left: 0;
+}
+
+.note .rank {
+  min-width: 2ch;
+  text-align: right;
+  color: var(--label);
+  flex-shrink: 0;
+}
+
+/* The viewer's own row (their player row / their nation): a faint ink wash
+   that reads on both the yellow and green backgrounds. Negative margins let
+   the highlight bleed across the note's padding, full width. */
+.note li.me-row {
+  background: rgba(66, 65, 62, 0.1);
+  margin: 0 -14px;
+  padding: 2px 14px;
 }
 
 .note h3 {
@@ -938,16 +1059,27 @@ button:hover {
 /* ---------- Narrow layouts ---------- */
 
 @media (max-width: 640px) {
-  .paper::before {
-    left: 26px;
-  }
-
-  .paper::after {
-    left: 30px;
-  }
-
+  /* The sheet is 660px wide here (horizontal scroll). The header band
+     sticks to the viewport's left edge so the title and the letter+timer
+     stay visible at every scroll position; 100vw is safe inside the mobile
+     query only (on desktop it would count the scrollbar gutter and create
+     a phantom horizontal scroll). Margin lines are NOT moved anymore: the
+     old left:26px override desynced them from .sheet-top's copies (the
+     "broken red line" seen on iPhone) and ran them through the letters. */
   .paper-header {
-    padding-left: calc(var(--margin-x) + 10px);
+    position: sticky;
+    left: 0;
+    width: 100vw;
+  }
+
+  .header-letter {
+    display: inline;
+  }
+
+  /* iOS Safari auto-zooms on focus of inputs under 16px; keep the clamp so
+     571-640px viewports (2.8vw > 16px) don't lose size. .cell input inherits. */
+  .round-row {
+    font-size: clamp(16px, 2.8vw, 22px);
   }
 
   .sidebar {
@@ -959,6 +1091,10 @@ button:hover {
 
   .note h3 {
     font-size: 17px;
+  }
+
+  .lb-tab {
+    font-size: 15px;
   }
 
   .note li {
@@ -1008,6 +1144,7 @@ button:hover {
   position: relative;
   width: min(980px, 94vw);
   max-height: 86vh;
+  max-height: 86dvh;
   overflow: auto;
   padding: 20px 30px 26px;
   background:

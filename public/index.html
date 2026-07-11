@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>categories.io</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
+  <title>Cattegories.io</title>
   <meta name="description" content="The classic pen &amp; paper word game online — one letter, 60 seconds, six categories. Play the world or a private room with friends." />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="preload" href="fonts/Papernotes.ttf" as="font" type="font/ttf" crossorigin />
@@ -13,7 +13,7 @@
 <body>
   <div id="landing-screen" class="screen">
     <main class="paper landing-paper">
-      <h1 class="landing-title">categories<span class="tld">.io</span></h1>
+      <h1 class="landing-title">cattegories<span class="tld">.io</span></h1>
       <div class="note landing-note">
         <p>The classic pen &amp; paper word game — one letter, 60 seconds, six categories. Race the whole world, or grab your friends and fill the page together.</p>
       </div>
@@ -84,8 +84,8 @@
       <main class="paper">
         <div class="sheet-top">
           <div class="paper-header">
-            <div class="paper-title">categories.io</div>
-            <div class="paper-timer">&#9201; <span id="timer">60</span></div>
+            <div class="paper-title">Cattegories.io</div>
+            <div class="paper-timer"><span id="header-letter" class="header-letter" aria-hidden="true"></span>&#9201; <span id="timer">60</span></div>
           </div>
 
           <div class="row labels-row">
@@ -142,13 +142,14 @@
       </main>
 
       <aside class="sidebar">
-        <div class="note">
-          <h3>Players</h3>
+        <div class="note" id="leaderboard-note">
+          <button id="lb-collapse-toggle" class="lb-collapse" aria-label="Collapse leaderboard">▾</button>
+          <div class="lb-tabs">
+            <button id="lb-tab-players" class="lb-tab active">Players</button>
+            <button id="lb-tab-nations" class="lb-tab">Nations</button>
+          </div>
           <ol id="player-leaderboard"></ol>
-        </div>
-        <div class="note note-tilt">
-          <h3>Nations</h3>
-          <ol id="nation-leaderboard"></ol>
+          <ol id="nation-leaderboard" class="hidden"></ol>
         </div>
       </aside>
 

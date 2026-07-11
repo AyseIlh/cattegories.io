@@ -13,11 +13,16 @@ const screens = {
 };
 
 function showScreen(name) {
+  // round:start calls showScreen('game') every round; when the screen is
+  // already visible this must be a no-op — resetting the window scroll here
+  // would yank the player's parked scroll position back to the top each turn.
+  const alreadyVisible = !screens[name].classList.contains('hidden');
   for (const key of Object.keys(screens)) {
     screens[key].classList.toggle('hidden', key !== name);
   }
+  if (alreadyVisible) return;
   // A focus() during an entry animation can scroll the container sideways;
-  // always land on a screen with its scroll reset.
+  // always land on a fresh screen with its scroll reset.
   screens[name].scrollLeft = 0;
   screens[name].scrollTop = 0;
   window.scrollTo(0, 0);
@@ -49,7 +54,16 @@ const startButton = document.getElementById('start-button');
 const waitingHint = document.getElementById('waiting-hint');
 
 const currentLetterEl = document.getElementById('current-letter');
+const headerLetterEl = document.getElementById('header-letter');
 const activeMagnifier = document.getElementById('active-magnifier');
+
+// The active row's letter cell is the source of truth (history snapshots
+// read it), but on mobile the sheet scrolls sideways and that cell can be
+// off-screen — so the sticky header mirrors the letter (visible ≤640px).
+function setCurrentLetter(letter) {
+  currentLetterEl.textContent = letter;
+  headerLetterEl.textContent = letter;
+}
 const summaryPopup = document.getElementById('summary-popup');
 const summaryBackdrop = document.getElementById('summary-backdrop');
 const summaryLetterEl = document.getElementById('summary-letter');
@@ -262,6 +276,18 @@ for (const category of CATEGORIES) {
   categoryInputs[category].addEventListener('input', queueSendAnswers);
 }
 
+// Enter jumps to the next category column (the browser scrolls the focused
+// cell into view — fine here, it's a direct response to the player's key).
+// On the last column Enter does nothing.
+CATEGORIES.forEach((category, i) => {
+  categoryInputs[category].addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const next = CATEGORIES[i + 1];
+    if (next) categoryInputs[next].focus();
+  });
+});
+
 function startCountdown(endsAt) {
   clearInterval(countdownInterval);
   function tick() {
@@ -385,7 +411,7 @@ function enterAnsweringPhase(state) {
   // history rows + the active row = current row number on the page
   const gamePaper = screens.game.querySelector('.paper');
   gamePaper.classList.toggle('page-extended', historyEl.children.length + 1 >= SCROLL_UNLOCK_ROW);
-  currentLetterEl.textContent = state.letter;
+  setCurrentLetter(state.letter);
   activeRow.classList.add('answering');
   for (const category of CATEGORIES) {
     categoryInputs[category].value = '';
@@ -396,8 +422,9 @@ function enterAnsweringPhase(state) {
   }
   activeScore.textContent = '?';
   activeScore.classList.add('pending');
-  // preventScroll: the player parks the page wherever they like; a new
-  // round must never move their scroll position.
+  // preventScroll: the player parks the page wherever they like — vertically
+  // AND horizontally (mobile sideways scroll). A new round must never move
+  // their scroll position; they come back to the Name column on their own.
   categoryInputs.name.focus({ preventScroll: true });
   startCountdown(localPhaseEnd(state));
 }
@@ -463,7 +490,7 @@ socket.on('state:sync', (state) => {
   myRoomId = state.roomId;
   amIHost = state.hostId === socket.id;
   hasJoinedOnce = true;
-  currentLetterEl.textContent = state.letter || '-';
+  setCurrentLetter(state.letter || '-');
 
   if (state.phase === 'waiting') {
     renderWaitingScreen(state);
@@ -511,18 +538,109 @@ function leaderboardRow(nameText, score) {
   return li;
 }
 
+// One ranked row: explicit rank number + flag/name + score. The rank is a
+// styled span (not the native <ol> marker) because the viewer's own row can
+// carry a large true rank like "441" when they're outside the top 10.
+function rankedRow(rank, nameText, score, isMe) {
+  const li = leaderboardRow(nameText, score);
+  const rankSpan = document.createElement('span');
+  rankSpan.className = 'rank';
+  rankSpan.textContent = rank;
+  li.insertBefore(rankSpan, li.firstChild);
+  if (isMe) li.classList.add('me-row');
+  return li;
+}
+
+// Renders a full sorted list as the top `limit` entries, plus my own row
+// with its true rank when I'm outside that top. Two modes for the "outside"
+// case, since the expanded and collapsed views want different behavior:
+//  - appendOwnRow=false (expanded/top-10): my row REPLACES the last slot,
+//    so the list always stays exactly `limit` rows (1..9 + me at 10).
+//  - appendOwnRow=true (collapsed/top-3): the top `limit` stays intact and
+//    my row is APPENDED after it, so the list grows to `limit + 1` rows
+//    (1..3 always shown, plus me as a 4th row if I'm not already in it).
+function renderRankedList(ol, entries, isMe, label, limit = 10, appendOwnRow = false) {
+  ol.innerHTML = '';
+  const myIndex = entries.findIndex(isMe);
+  const outsideTop = myIndex >= limit;
+  const topCount = outsideTop && !appendOwnRow ? limit - 1 : limit;
+  const top = entries.slice(0, topCount);
+  top.forEach((entry, i) => {
+    ol.appendChild(rankedRow(i + 1, label(entry), entry.score, i === myIndex));
+  });
+  if (outsideTop) {
+    const me = entries[myIndex];
+    ol.appendChild(rankedRow(myIndex + 1, label(me), me.score, true));
+  }
+}
+
+const playerLabel = (p) => `${flagEmoji(p.countryCode)} ${p.nickname}`;
+const nationLabel = (n) => {
+  const countryEntry = COUNTRIES.find(([code]) => code === n.countryCode);
+  return `${flagEmoji(n.countryCode)} ${countryEntry ? countryEntry[1] : n.countryCode}`;
+};
+
+// Kept for tab switches: re-render without waiting for the next broadcast.
+let lastLeaderboard = { players: [], nations: [] };
+// Collapsed = top 3 always shown, +1 appended row if I'm outside it (up to
+// 4 rows); expanded = top 10, replacing the last slot with my row if I'm
+// outside it (always exactly 10 rows) — the original behavior. Shared by
+// both tabs, toggled by lb-collapse-toggle. Phones start collapsed: the
+// post-it floats over the sheet and screen space is scarce.
+let leaderboardCollapsed = window.matchMedia('(max-width: 640px)').matches;
+
+function renderLeaderboards() {
+  const { players, nations } = lastLeaderboard;
+  const limit = leaderboardCollapsed ? 3 : 10;
+  renderRankedList(playerLeaderboardEl, players, (p) => p.id === socket.id, playerLabel, limit, leaderboardCollapsed);
+
+  // My nation always shows, even before it scores its first point.
+  const myNationListed = nations.some((n) => n.countryCode === myCountry);
+  const nationEntries = (!myNationListed && myCountry)
+    ? [...nations, { countryCode: myCountry, score: 0 }]
+    : nations;
+  renderRankedList(nationLeaderboardEl, nationEntries, (n) => n.countryCode === myCountry, nationLabel, limit, leaderboardCollapsed);
+}
+
 socket.on('leaderboard:update', ({ players, nations }) => {
-  playerLeaderboardEl.innerHTML = '';
+  lastLeaderboard = { players, nations };
+  renderLeaderboards();
+
+  // The waiting-room roster keeps the simple unranked format.
   waitingPlayerList.innerHTML = '';
   for (const p of players) {
-    playerLeaderboardEl.appendChild(leaderboardRow(`${flagEmoji(p.countryCode)} ${p.nickname}`, p.score));
-    waitingPlayerList.appendChild(leaderboardRow(`${flagEmoji(p.countryCode)} ${p.nickname}`, p.score));
-  }
-
-  nationLeaderboardEl.innerHTML = '';
-  for (const n of nations) {
-    const countryEntry = COUNTRIES.find(([code]) => code === n.countryCode);
-    const name = countryEntry ? countryEntry[1] : n.countryCode;
-    nationLeaderboardEl.appendChild(leaderboardRow(`${flagEmoji(n.countryCode)} ${name}`, n.score));
+    waitingPlayerList.appendChild(leaderboardRow(playerLabel(p), p.score));
   }
 });
+
+// Players / Nations tab switch: swap which list is visible and recolor the
+// post-it (yellow = players, green = nations — the old two-note colors).
+const leaderboardNote = document.getElementById('leaderboard-note');
+const lbTabPlayers = document.getElementById('lb-tab-players');
+const lbTabNations = document.getElementById('lb-tab-nations');
+
+function selectLeaderboardTab(showNations) {
+  lbTabPlayers.classList.toggle('active', !showNations);
+  lbTabNations.classList.toggle('active', showNations);
+  playerLeaderboardEl.classList.toggle('hidden', showNations);
+  nationLeaderboardEl.classList.toggle('hidden', !showNations);
+  leaderboardNote.classList.toggle('nations-view', showNations);
+}
+
+lbTabPlayers.addEventListener('click', () => selectLeaderboardTab(false));
+lbTabNations.addEventListener('click', () => selectLeaderboardTab(true));
+
+// Collapse/expand toggle: top 3 vs top 10, shared across both tabs.
+const lbCollapseToggle = document.getElementById('lb-collapse-toggle');
+lbCollapseToggle.addEventListener('click', () => {
+  leaderboardCollapsed = !leaderboardCollapsed;
+  leaderboardNote.classList.toggle('collapsed', leaderboardCollapsed);
+  lbCollapseToggle.setAttribute('aria-label', leaderboardCollapsed ? 'Expand leaderboard' : 'Collapse leaderboard');
+  renderLeaderboards();
+});
+
+// Sync the note class + arrow with the mobile-collapsed initial state.
+if (leaderboardCollapsed) {
+  leaderboardNote.classList.add('collapsed');
+  lbCollapseToggle.setAttribute('aria-label', 'Expand leaderboard');
+}
