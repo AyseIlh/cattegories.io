@@ -57,6 +57,14 @@ const connectionsPerIp = new Map();
 //          answers: Map<socketId, {name, city, animal, plant, food, object}>, timer }
 const rooms = new Map();
 
+// Lifetime counters for the private /stats page. In-memory only, so they
+// reset to zero on every redeploy/restart (same as everything else — no DB).
+const serverStats = {
+  startedAt: Date.now(),
+  roundsPlayed: 0, // answering phases that finished, across all rooms
+  wordsWritten: 0, // non-empty answer cells submitted by REAL players (bots excluded)
+};
+
 const VALID_COUNTRY_CODES = new Set(COUNTRIES.map(([code]) => code));
 
 // Clients can emit anything (including no payload at all); never trust a
@@ -309,6 +317,14 @@ function scoreRound(room) {
     }
   }
 
+  // Stats: count non-empty cells written by real players this round (bots excluded).
+  for (const [id, ans] of room.answers.entries()) {
+    if (Bots.isBot(id)) continue;
+    for (const category of CATEGORIES) {
+      if (normalize(ans[category])) serverStats.wordsWritten += 1;
+    }
+  }
+
   return { results, summary };
 }
 
@@ -325,6 +341,7 @@ function startAnswerPhase(room) {
 
 function endAnswerPhase(room) {
   const { results, summary } = scoreRound(room);
+  serverStats.roundsPlayed += 1;
   room.phase = 'results';
   room.phaseEndsAt = Date.now() + RESULT_PHASE_MS;
   io.to(room.id).emit('round:results', {
@@ -394,6 +411,72 @@ function joinRoom(socket, room, nickname, countryCode) {
     startAnswerPhase(room);
   }
 }
+
+// ---- Private stats page ----
+// Counts live players/rooms right now (bots vs. real people kept separate) and
+// pairs them with the lifetime counters. Reset on every restart (no DB).
+function liveStats() {
+  let realPlayers = 0;
+  let bots = 0;
+  let privateRooms = 0;
+  for (const room of rooms.values()) {
+    if (room.type === 'private') privateRooms += 1;
+    for (const [id, p] of room.players) {
+      if (!p.connected) continue;
+      if (Bots.isBot(id)) bots += 1;
+      else realPlayers += 1;
+    }
+  }
+  return { realPlayers, bots, privateRooms };
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function statsPage() {
+  const s = liveStats();
+  const uptimeMin = Math.floor((Date.now() - serverStats.startedAt) / 60000);
+  const card = (label, value) =>
+    `<div class="card"><div class="num">${escapeHtml(value)}</div><div class="lbl">${escapeHtml(label)}</div></div>`;
+  return `<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="5">
+<title>Cattegories · İstatistik</title>
+<style>
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#111; color:#eee; padding:24px; }
+  h1 { font-size:18px; font-weight:600; margin:0 0 4px; }
+  p.sub { color:#888; font-size:13px; margin:0 0 20px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .card { background:#1c1c1c; border:1px solid #2a2a2a; border-radius:10px; padding:18px; }
+  .num { font-size:32px; font-weight:700; color:#7ad; }
+  .lbl { font-size:13px; color:#999; margin-top:4px; }
+</style></head><body>
+<h1>Cattegories.io — Canlı İstatistik</h1>
+<p class="sub">5 saniyede bir yenilenir · sunucu açılışından beri · her yeniden başlatmada sıfırlanır</p>
+<div class="grid">
+  ${card('Anlık gerçek oyuncu', s.realPlayers)}
+  ${card('Anlık bot', s.bots)}
+  ${card('Aktif özel oda', s.privateRooms)}
+  ${card('Oynanan tur', serverStats.roundsPlayed)}
+  ${card('Yazılan kelime (gerçek)', serverStats.wordsWritten)}
+  ${card('Çalışma süresi (dk)', uptimeMin)}
+</div>
+</body></html>`;
+}
+
+// Secret is read from the STATS_TOKEN env var (set in Railway), NOT committed —
+// the repo is public. Unknown/missing key returns 404 to hide that the page
+// even exists. Disabled entirely if STATS_TOKEN is unset.
+app.get('/stats', (req, res) => {
+  const token = process.env.STATS_TOKEN;
+  if (!token || req.query.key !== token) {
+    return res.status(404).send('Not found');
+  }
+  res.status(200).send(statsPage());
+});
 
 // Behind a reverse proxy (Railway, etc.) every socket connects FROM the
 // proxy, so handshake.address is always the proxy's own IP — useless for a
