@@ -471,8 +471,11 @@ function statsPage() {
 // the repo is public. Unknown/missing key returns 404 to hide that the page
 // even exists. Disabled entirely if STATS_TOKEN is unset.
 app.get('/stats', (req, res) => {
-  const token = process.env.STATS_TOKEN;
-  if (!token || req.query.key !== token) {
+  // trim() both sides: env var values pasted into dashboards often pick up an
+  // invisible trailing newline/space, which would silently 404 forever.
+  const token = (process.env.STATS_TOKEN || '').trim();
+  const key = typeof req.query.key === 'string' ? req.query.key.trim() : '';
+  if (!token || key !== token) {
     return res.status(404).send('Not found');
   }
   res.status(200).send(statsPage());
