@@ -616,10 +616,8 @@ process.on('SIGTERM', () => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(process.env.PORT ? `Server running on port ${PORT}` : `Server running: http://localhost:${PORT}`);
-  // TEMPORARY diagnostic: logs the exact stored bytes (quotes/whitespace shown
-  // by JSON.stringify). The current token is already burned (shared in chat);
-  // remove this line and rotate the token once /stats works.
-  console.log(`stats token as stored: ${JSON.stringify(process.env.STATS_TOKEN)}`);
+  // Diagnostic only — never logs the token itself.
+  console.log(`stats page: ${process.env.STATS_TOKEN ? 'enabled' : 'DISABLED (STATS_TOKEN not set)'}`);
   createRoom({ id: 'public', type: 'public' });
   // Bots seat themselves in the public room and wake its round loop; with
   // them churning between BOT_MIN and BOT_MAX the room never idles again.
