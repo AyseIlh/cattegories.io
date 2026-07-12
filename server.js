@@ -1,5 +1,6 @@
 const path = require('path');
 const express = require('express');
+const compression = require('compression');
 const { Server } = require('socket.io');
 const http = require('http');
 const { WORD_LISTS } = require('./wordlists');
@@ -7,13 +8,22 @@ const { COUNTRIES } = require('./public/countries');
 const Bots = require('./bots');
 
 const app = express();
+// Railway (and most hosts) put the app behind a reverse proxy: every socket
+// connects FROM the proxy, so handshake.address would be the same proxy IP
+// for every player. Trusting the first hop makes Express (and, via it,
+// socket.io's handshake.address) read the real client IP from
+// x-forwarded-for instead — required for the per-IP connection cap to work.
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 // maxHttpBufferSize caps a single inbound message. Our largest legit message
 // is an answer:update of 6 fields x 15 chars ~= 400 bytes worst case (multi-
 // byte); 5 KB leaves ~12x headroom and blocks megabyte-sized junk payloads.
 const io = new Server(server, { maxHttpBufferSize: 5 * 1024 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(compression());
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
+
+app.get('/health', (_req, res) => res.status(200).send('ok'));
 
 const CATEGORIES = ['name', 'city', 'animal', 'plant', 'food', 'object'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
@@ -385,12 +395,24 @@ function joinRoom(socket, room, nickname, countryCode) {
   }
 }
 
+// Behind a reverse proxy (Railway, etc.) every socket connects FROM the
+// proxy, so handshake.address is always the proxy's own IP — useless for a
+// per-player cap. x-forwarded-for carries the real chain, client first; take
+// that first entry. Locally (no proxy) the header is absent and we fall back
+// to handshake.address, so this also works unchanged in dev.
+function getClientIp(socket) {
+  const forwarded = socket.handshake.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length) {
+    return forwarded.split(',')[0].trim();
+  }
+  return socket.handshake.address || 'unknown';
+}
+
 io.on('connection', (socket) => {
   // Per-IP connection cap: refuse a socket once this IP already holds
   // MAX_CONNS_PER_IP live sockets, killing the "open 5000 sockets from one
-  // box" attack. (Behind a real reverse proxy we'd read x-forwarded-for
-  // instead of handshake.address — revisit at deploy.)
-  const ip = socket.handshake.address || 'unknown';
+  // box" attack.
+  const ip = getClientIp(socket);
   const ipCount = (connectionsPerIp.get(ip) || 0) + 1;
   connectionsPerIp.set(ip, ipCount);
   if (ipCount > MAX_CONNS_PER_IP) {
@@ -491,9 +513,23 @@ io.on('connection', (socket) => {
   });
 });
 
+// Surface crashes in the logs instead of the process dying silently — a
+// deploy host restarts the process either way, but this leaves a trail.
+process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
+process.on('unhandledRejection', (err) => console.error('[unhandledRejection]', err));
+
+// On every redeploy the host sends SIGTERM to the old instance before
+// killing it. Closing the server lets in-flight requests/sockets finish
+// instead of being cut off mid-response.
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down.');
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5000).unref(); // force-exit if close hangs
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running: http://localhost:${PORT}`);
+  console.log(process.env.PORT ? `Server running on port ${PORT}` : `Server running: http://localhost:${PORT}`);
   createRoom({ id: 'public', type: 'public' });
   // Bots seat themselves in the public room and wake its round loop; with
   // them churning between BOT_MIN and BOT_MAX the room never idles again.
