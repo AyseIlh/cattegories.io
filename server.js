@@ -25,7 +25,7 @@ app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
 app.get('/health', (_req, res) => res.status(200).send('ok'));
 
-const CATEGORIES = ['name', 'city', 'animal', 'plant', 'food', 'object'];
+const CATEGORIES = ['name', 'city', 'animal', 'plant', 'movie', 'object'];
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 const ANSWER_PHASE_MS = 60 * 1000;
@@ -35,7 +35,7 @@ const LETTER_COOLDOWN = 15; // a drawn letter can't repeat for this many rounds
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // excludes 0/O/1/I/L (ambiguous in the handwritten UI font)
 const ROOM_CODE_LENGTH = 4;
 
-const MAX_ANSWER_LEN = 15;      // per-category answer character cap
+const MAX_ANSWER_LEN = 20;      // per-category answer character cap (raised from 15 for movie titles)
 const MAX_NICKNAME_LEN = 20;
 
 // ---- Abuse limits (tunable) ----
@@ -54,7 +54,7 @@ const connectionsPerIp = new Map();
 // Room = { id, type: 'public'|'private', phase: 'waiting'|'answering'|'results', hostId,
 //          players: Map<socketId, {nickname, countryCode, score, connected}>,
 //          nationScores: Map<countryCode, number>, currentLetter, phaseEndsAt,
-//          answers: Map<socketId, {name, city, animal, plant, food, object}>, timer }
+//          answers: Map<socketId, {name, city, animal, plant, movie, object}>, timer }
 const rooms = new Map();
 
 // Lifetime counters for the private /stats page. In-memory only, so they
@@ -261,7 +261,7 @@ function logRejected(room, id, category, raw, norm, reason) {
 
 function scoreRound(room) {
   // For each category, group valid answers (correct starting letter) by normalized text.
-  const results = new Map(); // socketId -> { name: pts, city: pts, animal: pts, plant: pts, food: pts, object: pts, total }
+  const results = new Map(); // socketId -> { name: pts, city: pts, animal: pts, plant: pts, movie: pts, object: pts, total }
   for (const id of room.answers.keys()) {
     const entry = { total: 0 };
     for (const category of CATEGORIES) entry[category] = 0;

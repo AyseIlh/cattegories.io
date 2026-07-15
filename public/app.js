@@ -1,6 +1,6 @@
 const socket = io();
 
-const CATEGORIES = ['name', 'city', 'animal', 'plant', 'food', 'object'];
+const CATEGORIES = ['name', 'city', 'animal', 'plant', 'movie', 'object'];
 const MAX_HISTORY = 100;
 const SCROLL_UNLOCK_ROW = 17; // from this row on, the page's clean side opens up below
 
