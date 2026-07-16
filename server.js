@@ -118,6 +118,28 @@ for (const category of CATEGORIES) {
   COMPACT_WORD_LISTS[category] = map;
 }
 
+// Leading articles a player naturally drops ("Shawshank Redemption" for
+// "The Shawshank Redemption") — only movie titles carry these in practice,
+// but trying them for every category is harmless (no other list has "the "-
+// prefixed entries, so the lookups just miss).
+const LEADING_ARTICLES = ['the ', 'a ', 'an '];
+
+// Resolves a normalized answer to its canonical list word, trying exact
+// spelling, then space/hyphen-insensitive, then (for either of those) with
+// a leading article restored. Returns null if nothing matches.
+function resolveCanonical(category, norm) {
+  if (WORD_LISTS[category].has(norm)) return norm;
+  const compactMatch = COMPACT_WORD_LISTS[category].get(compactify(norm));
+  if (compactMatch) return compactMatch;
+  for (const article of LEADING_ARTICLES) {
+    const withArticle = article + norm;
+    if (WORD_LISTS[category].has(withArticle)) return withArticle;
+    const articleCompactMatch = COMPACT_WORD_LISTS[category].get(compactify(withArticle));
+    if (articleCompactMatch) return articleCompactMatch;
+  }
+  return null;
+}
+
 // Strip control chars, zero-width/invisible chars, and bidi overrides — the
 // last let someone reshape a nickname to impersonate another player's name.
 // This is NOT profanity filtering (that's a separate, planned task); it only
@@ -310,18 +332,15 @@ function scoreRound(room) {
         logRejected(room, id, category, raw, norm, 'wrong-letter');
         continue;
       }
-      // Exact spelling first; falling back to the space/hyphen-insensitive
-      // match lets "sanfrancisco" count as "san francisco" without a second
-      // list entry — both group under the same canonical word below, so
-      // they split points as duplicates instead of double-scoring one city.
-      let canonical = norm;
-      if (!WORD_LISTS[category].has(norm)) {
-        const compactMatch = COMPACT_WORD_LISTS[category].get(compactify(norm));
-        if (!compactMatch) {
-          logRejected(room, id, category, raw, norm, 'not-in-list');
-          continue;
-        }
-        canonical = compactMatch;
+      // Exact spelling first, then space/hyphen-insensitive, then with a
+      // leading article restored ("Shawshank Redemption" -> "the shawshank
+      // redemption"). Every variant groups under the same canonical word
+      // below, so two spellings of the same answer split points as
+      // duplicates instead of one silently losing free points.
+      const canonical = resolveCanonical(category, norm);
+      if (!canonical) {
+        logRejected(room, id, category, raw, norm, 'not-in-list');
+        continue;
       }
       validNorms.add(norm);
       if (!groups.has(canonical)) groups.set(canonical, []);
