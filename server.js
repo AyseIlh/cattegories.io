@@ -95,6 +95,29 @@ function normalize(str) {
     .trim();
 }
 
+// Formatting-only characters a player easily drops or varies ("san francisco"
+// vs "sanfrancisco", "st-tropez" vs "st tropez"). Stripping them for lookup
+// lets those count as the same answer without touching the stored spelling
+// or what's shown back to players.
+function compactify(str) {
+  return str.replace(/['\s-]+/g, '');
+}
+
+// category -> Map<compact form, canonical list word>. Built once at startup
+// (WORD_LISTS entries are already normalized, lowercase ASCII) so a lookup
+// miss on the exact spelling can fall back to a space/hyphen-insensitive
+// match without re-scanning the whole list per answer. First entry wins on a
+// collision — vanishingly rare and not worth a tie-break rule.
+const COMPACT_WORD_LISTS = {};
+for (const category of CATEGORIES) {
+  const map = new Map();
+  for (const word of WORD_LISTS[category]) {
+    const key = compactify(word);
+    if (!map.has(key)) map.set(key, word);
+  }
+  COMPACT_WORD_LISTS[category] = map;
+}
+
 // Strip control chars, zero-width/invisible chars, and bidi overrides — the
 // last let someone reshape a nickname to impersonate another player's name.
 // This is NOT profanity filtering (that's a separate, planned task); it only
@@ -275,8 +298,9 @@ function scoreRound(room) {
   const summary = {};
 
   for (const category of CATEGORIES) {
-    const groups = new Map(); // normalized valid answer -> [socketIds]
-    const counts = new Map(); // normalized answer (any) -> occurrences
+    const groups = new Map(); // canonical list word -> [socketIds] (space/hyphen variants merge here)
+    const counts = new Map(); // normalized answer, as typed -> occurrences
+    const validNorms = new Set(); // typed norms that resolved to a valid canonical word
     for (const [id, ans] of room.answers.entries()) {
       const raw = ans[category];
       const norm = normalize(raw);
@@ -286,12 +310,22 @@ function scoreRound(room) {
         logRejected(room, id, category, raw, norm, 'wrong-letter');
         continue;
       }
+      // Exact spelling first; falling back to the space/hyphen-insensitive
+      // match lets "sanfrancisco" count as "san francisco" without a second
+      // list entry — both group under the same canonical word below, so
+      // they split points as duplicates instead of double-scoring one city.
+      let canonical = norm;
       if (!WORD_LISTS[category].has(norm)) {
-        logRejected(room, id, category, raw, norm, 'not-in-list');
-        continue;
+        const compactMatch = COMPACT_WORD_LISTS[category].get(compactify(norm));
+        if (!compactMatch) {
+          logRejected(room, id, category, raw, norm, 'not-in-list');
+          continue;
+        }
+        canonical = compactMatch;
       }
-      if (!groups.has(norm)) groups.set(norm, []);
-      groups.get(norm).push(id);
+      validNorms.add(norm);
+      if (!groups.has(canonical)) groups.set(canonical, []);
+      groups.get(canonical).push(id);
     }
     for (const ids of groups.values()) {
       const pts = ids.length === 1 ? 10 : 5;
@@ -302,7 +336,7 @@ function scoreRound(room) {
       }
     }
     summary[category] = [...counts.entries()]
-      .map(([word, count]) => ({ word, count, valid: groups.has(word) }))
+      .map(([word, count]) => ({ word, count, valid: validNorms.has(word) }))
       .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
       .slice(0, 10);
   }
