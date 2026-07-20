@@ -580,17 +580,21 @@ const nationLabel = (n) => {
   return `${flagEmoji(n.countryCode)} ${countryEntry ? countryEntry[1] : n.countryCode}`;
 };
 
-// Kept for tab switches: re-render without waiting for the next broadcast.
-let lastLeaderboard = { players: [], nations: [] };
+// Kept for tab/window switches: re-render without waiting for the next broadcast.
+let lastLeaderboard = { players1h: [], players24h: [], nations1h: [], nations24h: [] };
 // Collapsed = top 3 always shown, +1 appended row if I'm outside it (up to
 // 4 rows); expanded = top 10, replacing the last slot with my row if I'm
 // outside it (always exactly 10 rows) — the original behavior. Shared by
 // both tabs, toggled by lb-collapse-toggle. Phones start collapsed: the
 // post-it floats over the sheet and screen space is scarce.
 let leaderboardCollapsed = window.matchMedia('(max-width: 640px)').matches;
+// Which time window the leaderboard shows: the current UTC hour or the
+// current UTC day. Defaults to 1h so a new player competes on equal footing.
+let leaderboardWindow = '1h';
 
 function renderLeaderboards() {
-  const { players, nations } = lastLeaderboard;
+  const players = leaderboardWindow === '24h' ? lastLeaderboard.players24h : lastLeaderboard.players1h;
+  const nations = leaderboardWindow === '24h' ? lastLeaderboard.nations24h : lastLeaderboard.nations1h;
   const limit = leaderboardCollapsed ? 3 : 10;
   renderRankedList(playerLeaderboardEl, players, (p) => p.id === socket.id, playerLabel, limit, leaderboardCollapsed);
 
@@ -602,13 +606,14 @@ function renderLeaderboards() {
   renderRankedList(nationLeaderboardEl, nationEntries, (n) => n.countryCode === myCountry, nationLabel, limit, leaderboardCollapsed);
 }
 
-socket.on('leaderboard:update', ({ players, nations }) => {
-  lastLeaderboard = { players, nations };
+socket.on('leaderboard:update', ({ players1h, players24h, nations1h, nations24h }) => {
+  lastLeaderboard = { players1h, players24h, nations1h, nations24h };
   renderLeaderboards();
 
-  // The waiting-room roster keeps the simple unranked format.
+  // The waiting-room roster keeps the simple unranked format, showing the
+  // daily (24h) scores.
   waitingPlayerList.innerHTML = '';
-  for (const p of players) {
+  for (const p of players24h) {
     waitingPlayerList.appendChild(leaderboardRow(playerLabel(p), p.score));
   }
 });
@@ -629,6 +634,39 @@ function selectLeaderboardTab(showNations) {
 
 lbTabPlayers.addEventListener('click', () => selectLeaderboardTab(false));
 lbTabNations.addEventListener('click', () => selectLeaderboardTab(true));
+
+// 1h/24h window toggle: same visual language as the Players/Nations tabs.
+const lbWindow1h = document.getElementById('lb-window-1h');
+const lbWindow24h = document.getElementById('lb-window-24h');
+const lbWindowReset = document.getElementById('lb-window-reset');
+
+// Subtle live countdown to the selected window's reset: next UTC hour for
+// 1h, next UTC midnight for 24h. Same epoch math the server uses, so the
+// label flips at the exact moment the leaderboard resets.
+function renderWindowReset() {
+  const now = Date.now();
+  const windowMs = leaderboardWindow === '24h' ? 24 * 3600 * 1000 : 3600 * 1000;
+  const msLeft = (Math.floor(now / windowMs) + 1) * windowMs - now;
+  const totalSec = Math.floor(msLeft / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+  const s = String(totalSec % 60).padStart(2, '0');
+  lbWindowReset.textContent = h > 0 ? `resets in ${h}:${m}:${s}` : `resets in ${m}:${s}`;
+}
+
+setInterval(renderWindowReset, 1000);
+renderWindowReset();
+
+function selectLeaderboardWindow(timeWindow) {
+  leaderboardWindow = timeWindow;
+  lbWindow1h.classList.toggle('active', timeWindow === '1h');
+  lbWindow24h.classList.toggle('active', timeWindow === '24h');
+  renderWindowReset();
+  renderLeaderboards();
+}
+
+lbWindow1h.addEventListener('click', () => selectLeaderboardWindow('1h'));
+lbWindow24h.addEventListener('click', () => selectLeaderboardWindow('24h'));
 
 // Collapse/expand toggle: top 3 vs top 10, shared across both tabs.
 const lbCollapseToggle = document.getElementById('lb-collapse-toggle');

@@ -32,6 +32,41 @@ const ANSWER_PHASE_MS = 60 * 1000;
 const RESULT_PHASE_MS = 8 * 1000;
 const LETTER_COOLDOWN = 15; // a drawn letter can't repeat for this many rounds
 
+// Leaderboard time windows. Both are fixed UTC-aligned buckets derived from
+// the epoch, so every player on the planet sees the same boundaries and no
+// wall-clock configuration is involved:
+//  - 1h window: the current UTC hour (13:00-14:00, then it resets).
+//  - 24h window: the current UTC calendar day (00:00-24:00, then it resets).
+const HOUR_MS = 3600 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+function hourBucket(now = Date.now()) {
+  return Math.floor(now / HOUR_MS);
+}
+function dayBucket(now = Date.now()) {
+  return Math.floor(now / DAY_MS);
+}
+
+// Lazy window rollover: when the current UTC hour/day no longer matches what
+// the room last scored into, the matching window's scores reset for everyone
+// at once. Called before scoring (points land in the fresh bucket) and before
+// every leaderboard broadcast (a boundary crossed mid-round still shows up on
+// the next update). No timers needed — idle rooms simply roll over on their
+// next activity.
+function applyWindowRollover(room, now = Date.now()) {
+  const hb = hourBucket(now);
+  if (room.hourBucket !== hb) {
+    room.hourBucket = hb;
+    for (const p of room.players.values()) p.score1h = 0;
+    room.nationScores1h.clear();
+  }
+  const db = dayBucket(now);
+  if (room.dayBucket !== db) {
+    room.dayBucket = db;
+    for (const p of room.players.values()) p.score24h = 0;
+    room.nationScores24h.clear();
+  }
+}
+
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // excludes 0/O/1/I/L (ambiguous in the handwritten UI font)
 const ROOM_CODE_LENGTH = 4;
 
@@ -52,8 +87,9 @@ const connectionsPerIp = new Map();
 
 // rooms: roomId -> Room
 // Room = { id, type: 'public'|'private', phase: 'waiting'|'answering'|'results', hostId,
-//          players: Map<socketId, {nickname, countryCode, score, connected}>,
-//          nationScores: Map<countryCode, number>, currentLetter, phaseEndsAt,
+//          players: Map<socketId, {nickname, countryCode, score1h, score24h, connected}>,
+//          nationScores1h: Map<countryCode, number>, nationScores24h: Map<countryCode, number>,
+//          hourBucket, dayBucket, currentLetter, phaseEndsAt,
 //          answers: Map<socketId, {name, city, animal, plant, movie, object}>, timer }
 const rooms = new Map();
 
@@ -174,7 +210,10 @@ function createRoom({ id, type, hostId = null }) {
     phase: type === 'public' ? 'answering' : 'waiting',
     hostId,
     players: new Map(),
-    nationScores: new Map(),
+    nationScores1h: new Map(),
+    nationScores24h: new Map(),
+    hourBucket: hourBucket(),
+    dayBucket: dayBucket(),
     currentLetter: null,
     recentLetters: [], // last LETTER_COOLDOWN drawn letters, oldest first
     phaseEndsAt: 0,
@@ -254,24 +293,34 @@ function pickNextLetter(room) {
 }
 
 // Full sorted lists (not just a top 10): the client shows ranks 1-9 plus the
-// viewer's own row with its true rank, so it needs everyone's position. At
-// the current scale (dozens of players) the payload is a few KB; if the
-// public room ever grows to hundreds, switch to top-10 + a per-socket rank.
-function topPlayers(room) {
+// viewer's own row with its true rank, so it needs everyone's position. Four
+// lists go out per broadcast (players/nations x 1h/24h windows) so the
+// client-side window toggle is instant; at the current scale (dozens of
+// players) the payload is ~10 KB. If the public room ever grows to hundreds,
+// switch to top-10 + a per-socket rank.
+function topPlayers(room, timeWindow) {
+  const key = timeWindow === '24h' ? 'score24h' : 'score1h';
   return [...room.players.entries()]
     .filter(([, p]) => p.connected)
-    .map(([id, p]) => ({ id, nickname: p.nickname, countryCode: p.countryCode, score: p.score }))
+    .map(([id, p]) => ({ id, nickname: p.nickname, countryCode: p.countryCode, score: p[key] }))
     .sort((a, b) => b.score - a.score);
 }
 
-function topNations(room) {
-  return [...room.nationScores.entries()]
+function topNations(room, timeWindow) {
+  const scores = timeWindow === '24h' ? room.nationScores24h : room.nationScores1h;
+  return [...scores.entries()]
     .map(([countryCode, score]) => ({ countryCode, score }))
     .sort((a, b) => b.score - a.score);
 }
 
 function broadcastLeaderboards(room) {
-  io.to(room.id).emit('leaderboard:update', { players: topPlayers(room), nations: topNations(room) });
+  applyWindowRollover(room);
+  io.to(room.id).emit('leaderboard:update', {
+    players1h: topPlayers(room, '1h'),
+    players24h: topPlayers(room, '24h'),
+    nations1h: topNations(room, '1h'),
+    nations24h: topNations(room, '24h'),
+  });
 }
 
 function publicState(room) {
@@ -305,6 +354,10 @@ function logRejected(room, id, category, raw, norm, reason) {
 }
 
 function scoreRound(room) {
+  // Points land in the current UTC hour/day buckets; if a boundary was crossed
+  // since the last activity, the stale window resets first.
+  applyWindowRollover(room);
+
   // For each category, group valid answers (correct starting letter) by normalized text.
   const results = new Map(); // socketId -> { name: pts, city: pts, animal: pts, plant: pts, movie: pts, object: pts, total }
   for (const id of room.answers.keys()) {
@@ -360,13 +413,15 @@ function scoreRound(room) {
       .slice(0, 10);
   }
 
-  // Apply to player + nation totals
+  // Apply to player + nation totals in both time windows
   for (const [id, r] of results.entries()) {
     const player = room.players.get(id);
     if (!player) continue;
-    player.score += r.total;
+    player.score1h += r.total;
+    player.score24h += r.total;
     if (player.countryCode) {
-      room.nationScores.set(player.countryCode, (room.nationScores.get(player.countryCode) || 0) + r.total);
+      room.nationScores1h.set(player.countryCode, (room.nationScores1h.get(player.countryCode) || 0) + r.total);
+      room.nationScores24h.set(player.countryCode, (room.nationScores24h.get(player.countryCode) || 0) + r.total);
     }
   }
 
@@ -413,7 +468,8 @@ function buildPlayer(nickname, countryCode) {
   return {
     nickname: sanitizeNickname(nickname) || 'Player',
     countryCode: VALID_COUNTRY_CODES.has(code) ? code : '',
-    score: 0,
+    score1h: 0,
+    score24h: 0,
     connected: true,
   };
 }

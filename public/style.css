@@ -979,6 +979,27 @@ button:hover {
   border-bottom: 1px solid rgba(66, 65, 62, 0.25);
 }
 
+/* 1h/24h window toggle: own row directly under the Players/Nations tabs,
+   same .lb-tab look. Sitting on its own row keeps it clear of the collapse
+   toggle (top-right corner) and leaves the tab row uncluttered. */
+.lb-window {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding-right: 22px; /* keep the reset label clear of the collapse toggle */
+}
+
+/* Live countdown to the window's reset, right of the 1h/24h buttons.
+   Deliberately quiet: small, low-contrast, background information. */
+.lb-reset {
+  margin-left: auto;
+  align-self: center;
+  font-size: 12px;
+  color: var(--label);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums; /* digits don't jiggle as they tick */
+}
+
 .lb-tab {
   width: auto;
   margin-top: 0;
