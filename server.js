@@ -18,7 +18,17 @@ const server = http.createServer(app);
 // maxHttpBufferSize caps a single inbound message. Our largest legit message
 // is an answer:update of 6 fields x 15 chars ~= 400 bytes worst case (multi-
 // byte); 5 KB leaves ~12x headroom and blocks megabyte-sized junk payloads.
-const io = new Server(server, { maxHttpBufferSize: 5 * 1024 });
+// CORS: the Capacitor iOS/Android WebViews load from a local scheme
+// (capacitor:// / http://localhost) and connect to the live server over
+// HTTPS. Allowing all origins keeps browser players, mobile apps and any
+// future playable/embedded versions on the same endpoint.
+const io = new Server(server, {
+  maxHttpBufferSize: 5 * 1024,
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
 
 app.use(compression());
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));

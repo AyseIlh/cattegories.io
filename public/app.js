@@ -41,6 +41,7 @@ const playPublicButton = document.getElementById('play-public-button');
 const playPrivateButton = document.getElementById('play-private-button');
 const joinCodeButton = document.getElementById('join-code-button');
 const joinCodeArea = document.getElementById('join-code-area');
+const modeErrorEl = document.getElementById('mode-error');
 const roomCodeInput = document.getElementById('room-code-input');
 const waitingBackButton = document.getElementById('waiting-back-button');
 const codeErrorEl = document.getElementById('code-error');
@@ -107,9 +108,20 @@ function localPhaseEnd({ phaseEndsAt, serverNow }) {
 // reconnects with a fresh identity — rejoin the same room automatically
 // instead of leaving the player typing into the void.
 socket.on('connect', () => {
+  modeErrorEl.classList.add('hidden');
   if (hasJoinedOnce && myNickname && myRoomId) {
     socket.emit('player:join', { nickname: myNickname, countryCode: myCountry, roomId: myRoomId });
   }
+});
+
+socket.on('connect_error', (err) => {
+  modeErrorEl.textContent = `Connection error: ${err.message}`;
+  modeErrorEl.classList.remove('hidden');
+});
+
+socket.on('disconnect', (reason) => {
+  modeErrorEl.textContent = `Disconnected: ${reason}. Reconnecting…`;
+  modeErrorEl.classList.remove('hidden');
 });
 
 const defaultJoinSubtitle = joinSubtitle.textContent;
@@ -183,12 +195,27 @@ continueButton.addEventListener('click', () => {
   }
 });
 
+function requireConnection(action) {
+  if (!socket.connected) {
+    modeErrorEl.textContent = 'Connecting to server… Please wait.';
+    modeErrorEl.classList.remove('hidden');
+    return false;
+  }
+  modeErrorEl.classList.add('hidden');
+  action();
+  return true;
+}
+
 playPublicButton.addEventListener('click', () => {
-  socket.emit('player:join', { nickname: myNickname, countryCode: myCountry, roomId: 'public' });
+  requireConnection(() => {
+    socket.emit('player:join', { nickname: myNickname, countryCode: myCountry, roomId: 'public' });
+  });
 });
 
 playPrivateButton.addEventListener('click', () => {
-  socket.emit('room:create', { nickname: myNickname, countryCode: myCountry });
+  requireConnection(() => {
+    socket.emit('room:create', { nickname: myNickname, countryCode: myCountry });
+  });
 });
 
 joinCodeButton.addEventListener('click', () => {
@@ -220,7 +247,9 @@ function submitRoomCode() {
     return;
   }
   codeErrorEl.classList.add('hidden');
-  socket.emit('room:join', { roomId: code, nickname: myNickname, countryCode: myCountry });
+  requireConnection(() => {
+    socket.emit('room:join', { roomId: code, nickname: myNickname, countryCode: myCountry });
+  });
 }
 
 joinCodeSubmit.addEventListener('click', submitRoomCode);
@@ -233,12 +262,16 @@ roomCodeInput.addEventListener('input', () => {
 
 fallbackPublicButton.addEventListener('click', () => {
   pendingRoomId = null;
-  socket.emit('player:join', { nickname: myNickname, countryCode: myCountry, roomId: 'public' });
+  requireConnection(() => {
+    socket.emit('player:join', { nickname: myNickname, countryCode: myCountry, roomId: 'public' });
+  });
 });
 
 fallbackCreateButton.addEventListener('click', () => {
   pendingRoomId = null;
-  socket.emit('room:create', { nickname: myNickname, countryCode: myCountry });
+  requireConnection(() => {
+    socket.emit('room:create', { nickname: myNickname, countryCode: myCountry });
+  });
 });
 
 copyLinkButton.addEventListener('click', () => {
