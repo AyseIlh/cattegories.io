@@ -1,4 +1,4 @@
-const socket = io();
+const socket = window.CATTEGORIES_SERVER_URL ? io(window.CATTEGORIES_SERVER_URL) : io();
 
 const CATEGORIES = ['name', 'city', 'animal', 'plant', 'movie', 'object'];
 const MAX_HISTORY = 100;
