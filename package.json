@@ -8,9 +8,16 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "cap:copy": "cp env.production.js public/env.js && npx cap copy",
+    "cap:ios": "cp env.production.js public/env.js && npx cap copy ios && npx cap open ios",
+    "cap:android": "cp env.production.js public/env.js && npx cap copy android && npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "compression": "^1.8.1",
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
