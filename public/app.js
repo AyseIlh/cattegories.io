@@ -12,6 +12,8 @@ const screens = {
   game: document.getElementById('game-screen'),
 };
 
+let currentScreen = 'landing';
+
 function showScreen(name) {
   // round:start calls showScreen('game') every round; when the screen is
   // already visible this must be a no-op — resetting the window scroll here
@@ -20,6 +22,7 @@ function showScreen(name) {
   for (const key of Object.keys(screens)) {
     screens[key].classList.toggle('hidden', key !== name);
   }
+  currentScreen = name;
   if (alreadyVisible) return;
   // A focus() during an entry animation can scroll the container sideways;
   // always land on a fresh screen with its scroll reset.
@@ -714,4 +717,36 @@ lbCollapseToggle.addEventListener('click', () => {
 if (leaderboardCollapsed) {
   leaderboardNote.classList.add('collapsed');
   lbCollapseToggle.setAttribute('aria-label', 'Expand leaderboard');
+}
+
+// Android back button: walk back through the app's screens instead of
+// immediately killing the app. iOS has no hardware back button, so this
+// listener is ignored there.
+if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+  window.Capacitor.Plugins.App.addListener('backButton', () => {
+    if (currentScreen === 'game') {
+      // Leave the room server-side but keep the socket alive, then go back
+      // to the mode screen so the player can choose again.
+      socket.emit('room:leave');
+      myRoomId = null;
+      amIHost = false;
+      hasJoinedOnce = false;
+      pendingRoomId = null;
+      showScreen('mode');
+      return;
+    }
+    if (currentScreen === 'waiting') {
+      waitingBackButton.click();
+      return;
+    }
+    if (currentScreen === 'mode') {
+      showScreen('join');
+      return;
+    }
+    if (currentScreen === 'join') {
+      showScreen('landing');
+      return;
+    }
+    // Landing screen: fall through and let Android close the app.
+  });
 }

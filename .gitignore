@@ -13,7 +13,7 @@ ios/DerivedData/
 ios/*.xcworkspace/xcuserdata/
 ios/*.xcodeproj/xcuserdata/
 ios/*.xcodeproj/project.xcworkspace/
-ios/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 
 # Android build artifacts
 android/.gradle/
