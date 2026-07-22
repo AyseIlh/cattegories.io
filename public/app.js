@@ -59,6 +59,7 @@ const waitingHint = document.getElementById('waiting-hint');
 
 const currentLetterEl = document.getElementById('current-letter');
 const headerLetterEl = document.getElementById('header-letter');
+const paperTitleEl = document.getElementById('paper-title');
 const activeMagnifier = document.getElementById('active-magnifier');
 
 // The active row's letter cell is the source of truth (history snapshots
@@ -239,6 +240,15 @@ waitingBackButton.addEventListener('click', () => {
   pendingRoomId = null;
   joinSubtitle.textContent = defaultJoinSubtitle;
   showScreen('landing');
+});
+
+paperTitleEl.addEventListener('click', () => {
+  socket.emit('room:leave');
+  myRoomId = null;
+  amIHost = false;
+  hasJoinedOnce = false;
+  pendingRoomId = null;
+  showScreen('mode');
 });
 
 function submitRoomCode() {
