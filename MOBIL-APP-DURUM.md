@@ -6,6 +6,12 @@
 
 **Son güncelleme:** 2026-07-22
 
+> ⏸️ **MOBİL ÇALIŞMA KULLANICI KARARIYLA SÜRESİZ ERTELEDİ** (2026-07-22).
+> Oyun web'de istenen seviyeye geldi; iOS/Android store işi bir süre
+> bekleyecek. Devam edildiğinde kaldığımız yer: **Faz 4 — Store hazırlığı**
+> (aşağıda). Tüm altyapı (Capacitor, iOS build, cross-play) hazır ve çalışır
+> durumda; sadece store'a çıkılmadı.
+
 ## Kararlar (kesinleşmiş)
 
 - **Yöntem: Capacitor** — mevcut `public/` klasörü iOS + Android app'e ortak
@@ -21,16 +27,28 @@
 | Faz | İş | Durum |
 |---|---|---|
 | — | 1h/24h UTC leaderboard (web) | ✅ Canlıda (commit `e78e3b7`) |
+| — | Oyuncu analitiği (JSONL log + /stats sayfası) | ✅ Canlıda (`6f65469`, `8438c48`) |
 | 0 | Hazırlık: socket.io vendor + SERVER_URL config | ✅ (commit `87ac348`) |
 | 1 | Capacitor iskeleti (`cap init`, `cap add ios/android`) | ✅ (commit `d666a53`) |
 | 2 | iOS: simulator, cross-play, safe-area, CORS fix | ✅ (commit `5596628`, `d885340`) |
 | 2b | iOS gerçek cihaz: iPhone 11'de build + oyun testi | ✅ |
 | 3 | Android: geri tuşu implement edildi, emulator testi **blocked** | ⚠️ (commit `f44618e`) |
-| 4 | Store: hesaplar, privacy policy, onay | ⬜ Sıradaki |
+| 4 | Store: hesaplar, privacy policy, onay | ⬜ **KALDIĞIMIZ YER** |
 
-**Şu an yapılan:** Faz 4 öncesi küçük UX iyileştirmeleri. Son eklenen:
-oyun ekranında sol üstteki **Cattegories.io logosuna tıklayınca** mode
-seçim ekranına dönme (`room:leave` + mode ekranı).
+## Analitik (web, canlıda)
+
+- `analytics.js`: olayları (pageview, join, leave, word) JSONL olarak
+  `ANALYTICS_DIR` altına yazar; RAM'de UTC günü bazlı agregat tutar,
+  açılışta bugün+dün replay edilir.
+- İzleme: `https://www.cattegories.io/stats?key=TOKEN`
+  (token Railway Variables'ta `STATS_TOKEN`; **www şart**, apex domain
+  path'i düşürüyor).
+- **Railway Volume:** kod `RAILWAY_VOLUME_MOUNT_PATH` varsa otomatik oraya
+  yazar. Volume kurulumu kullanıcı tarafında yapıldı/yapılıyor — devam
+  oturumunda `/data` mount'unun takıldığını deploy loglarından doğrula.
+  Volume yoksa redeploy'da loglar sıfırlanır (bilinen sınır).
+- Privacy policy yazılırken (Faz 4) IP + nickname loglandığı mutlaka
+  belirtilmeli.
 
 ## Sayfa / ekran isimleri (tarif için)
 
@@ -53,10 +71,11 @@ seçim ekranına dönme (`room:leave` + mode ekranı).
   2. Apple Silicon Mac'e geçince emulator testi.
   3. Genymotion gibi Intel uyumlu 3. parti emulator.
 
-## Faz 4 — Store (sıradaki, kullanıcı hesaplarıyla)
+## Faz 4 — Store (KALDIĞIMIZ YER, kullanıcı hesaplarıyla)
 
 1. Apple Developer ($99/yıl) + Google Play ($25) hesapları (kullanıcı açar).
-2. `/privacy` statik sayfa (nickname/ülke/IP toplandığı için şart).
+2. `/privacy` statik sayfa (nickname/ülke/IP toplandığı için şart —
+   analitik sonrası IP loglama da dahil).
 3. İkon + splash markalaştırma (şu an Capacitor default).
 4. Ekran görüntüleri + store açıklamaları.
 5. TestFlight + internal testing → onay (1-3 gün).
@@ -88,4 +107,5 @@ npm start   # http://localhost:3000
 - Web sitesi tüm süreç boyunca canlı ve bozulmadan kalır; her faz ayrı commit.
 - Geri alma: `ios/` `android/` klasörleri + config silinirse proje eski haline döner.
 - Home butonu denemesi (⌂ harf üstü) yapıldı, UX beğenilmedi, geri alındı;
-  yerine logo tıklaması çözümü uygulandı.
+  yerine logo tıklaması çözümü uygulandı (oyun ekranında sol üstteki
+  Cattegories.io logosu mode ekranına döner).
