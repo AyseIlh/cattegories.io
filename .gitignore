@@ -3,6 +3,9 @@ node_modules/
 .claude/
 ogrenme-yol-haritasi.md
 
+# Analytics event logs (local; on Railway they live on a volume)
+analytics/
+
 # Capacitor generated web assets (rebuilt by npx cap copy)
 ios/App/App/public/
 android/app/src/main/assets/public/

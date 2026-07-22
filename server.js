@@ -6,6 +6,7 @@ const http = require('http');
 const { WORD_LISTS } = require('./wordlists');
 const { COUNTRIES } = require('./public/countries');
 const Bots = require('./bots');
+const Analytics = require('./analytics');
 
 const app = express();
 // Railway (and most hosts) put the app behind a reverse proxy: every socket
@@ -31,6 +32,14 @@ const io = new Server(server, {
 });
 
 app.use(compression());
+
+// Top of the "visited -> played" funnel: count every index load before the
+// static middleware serves it. Runs before express.static so it never
+// interferes with asset delivery.
+app.get('/', (req, _res, next) => {
+  Analytics.trackEvent('pageview', { ip: req.ip });
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
 app.get('/health', (_req, res) => res.status(200).send('ok'));
@@ -438,8 +447,20 @@ function scoreRound(room) {
   // Stats: count non-empty cells written by real players this round (bots excluded).
   for (const [id, ans] of room.answers.entries()) {
     if (Bots.isBot(id)) continue;
+    const player = room.players.get(id);
+    const r = results.get(id);
     for (const category of CATEGORIES) {
-      if (normalize(ans[category])) serverStats.wordsWritten += 1;
+      const norm = normalize(ans[category]);
+      if (!norm) continue;
+      serverStats.wordsWritten += 1;
+      Analytics.trackEvent('word', {
+        nickname: player?.nickname || '?',
+        letter: room.currentLetter,
+        cat: category,
+        word: norm,
+        valid: r ? r[category] > 0 : false,
+        pts: r ? r[category] : 0,
+      });
     }
   }
 
@@ -492,6 +513,20 @@ function leaveCurrentRoom(socket) {
   const room = getRoomForSocket(socket);
   if (!room) return;
 
+  // Analytics: close the play session this socket opened in joinRoom. Runs
+  // for both disconnects and room switches; bots never pass through here
+  // (they have no socket), so no bot check is needed.
+  if (socket.data.joinedAt) {
+    const player = room.players.get(socket.id);
+    Analytics.trackEvent('leave', {
+      ip: getClientIp(socket),
+      nickname: player?.nickname || '?',
+      roomType: room.type,
+      durationSec: Math.round((Date.now() - socket.data.joinedAt) / 1000),
+    });
+    socket.data.joinedAt = null;
+  }
+
   socket.leave(room.id);
   socket.data.roomId = null;
   room.players.delete(socket.id);
@@ -525,6 +560,16 @@ function joinRoom(socket, room, nickname, countryCode) {
   room.players.set(socket.id, buildPlayer(nickname, countryCode));
   socket.join(room.id);
   socket.data.roomId = room.id;
+  // Analytics: open a play session. Only real players reach this (bots seat
+  // themselves directly), so every join here is a person.
+  const player = room.players.get(socket.id);
+  Analytics.trackEvent('join', {
+    ip: getClientIp(socket),
+    nickname: player.nickname,
+    country: player.countryCode,
+    roomType: room.type,
+  });
+  socket.data.joinedAt = Date.now();
   // Wake an idle public room now that it has a player again.
   if (room.type === 'public' && !room.timer) {
     startAnswerPhase(room);
@@ -557,9 +602,14 @@ function escapeHtml(str) {
 
 function statsPage() {
   const s = liveStats();
+  const d = Analytics.getDailyStats();
   const uptimeMin = Math.floor((Date.now() - serverStats.startedAt) / 60000);
+  const joinRate = d.uniqueVisitors ? Math.round((d.uniquePlayers / d.uniqueVisitors) * 100) : 0;
   const card = (label, value) =>
     `<div class="card"><div class="num">${escapeHtml(value)}</div><div class="lbl">${escapeHtml(label)}</div></div>`;
+  const wordRows = (list) => list.length
+    ? list.map((w, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(w.word)}</td><td>${w.count}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">henüz veri yok</td></tr>';
   return `<!doctype html><html lang="tr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="5">
@@ -567,14 +617,23 @@ function statsPage() {
 <style>
   body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#111; color:#eee; padding:24px; }
   h1 { font-size:18px; font-weight:600; margin:0 0 4px; }
+  h2 { font-size:14px; font-weight:600; margin:28px 0 10px; color:#bbb; }
   p.sub { color:#888; font-size:13px; margin:0 0 20px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
   .card { background:#1c1c1c; border:1px solid #2a2a2a; border-radius:10px; padding:18px; }
   .num { font-size:32px; font-weight:700; color:#7ad; }
   .lbl { font-size:13px; color:#999; margin-top:4px; }
+  .tables { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  table { width:100%; border-collapse:collapse; background:#1c1c1c; border:1px solid #2a2a2a; border-radius:10px; overflow:hidden; font-size:13px; }
+  th, td { padding:8px 12px; text-align:left; border-bottom:1px solid #242424; }
+  th { color:#888; font-weight:600; }
+  td:last-child, th:last-child { text-align:right; }
+  td:first-child, th:first-child { color:#666; width:28px; }
+  .empty { color:#666; text-align:center; }
 </style></head><body>
 <h1>Cattegories.io — Canlı İstatistik</h1>
-<p class="sub">5 saniyede bir yenilenir · sunucu açılışından beri · her yeniden başlatmada sıfırlanır</p>
+<p class="sub">5 saniyede bir yenilenir · "bugün" verileri UTC günü bazlıdır, gece 00:00 UTC'de sıfırlanır</p>
+<h2>Şu an</h2>
 <div class="grid">
   ${card('Anlık gerçek oyuncu', s.realPlayers)}
   ${card('Anlık bot', s.bots)}
@@ -582,6 +641,21 @@ function statsPage() {
   ${card('Oynanan tur', serverStats.roundsPlayed)}
   ${card('Yazılan kelime (gerçek)', serverStats.wordsWritten)}
   ${card('Çalışma süresi (dk)', uptimeMin)}
+</div>
+<h2>Bugün (UTC ${escapeHtml(d.day)})</h2>
+<div class="grid">
+  ${card('Sayfa görüntüleme', d.pageviews)}
+  ${card('Tekil ziyaretçi', d.uniqueVisitors)}
+  ${card('Oyuna katılan (tekil)', d.uniquePlayers)}
+  ${card('Katılım oranı', joinRate + '%')}
+  ${card('Toplam oturum', d.sessions)}
+  ${card('Ort. oturum (dk)', (d.avgSessionSec / 60).toFixed(1))}
+  ${card('Toplam oyun süresi (dk)', d.totalPlayMin)}
+</div>
+<h2>Bugünün kelimeleri</h2>
+<div class="tables">
+  <table><thead><tr><th>#</th><th>Geçerli kelime</th><th>kez</th></tr></thead><tbody>${wordRows(d.topWords)}</tbody></table>
+  <table><thead><tr><th>#</th><th>Reddedilen (listede yok)</th><th>kez</th></tr></thead><tbody>${wordRows(d.topRejected)}</tbody></table>
 </div>
 </body></html>`;
 }
@@ -737,6 +811,7 @@ server.listen(PORT, () => {
   console.log(process.env.PORT ? `Server running on port ${PORT}` : `Server running: http://localhost:${PORT}`);
   // Diagnostic only — never logs the token itself.
   console.log(`stats page: ${process.env.STATS_TOKEN ? 'enabled' : 'DISABLED (STATS_TOKEN not set)'}`);
+  Analytics.init(); // replay today's/yesterday's event logs into memory
   createRoom({ id: 'public', type: 'public' });
   // Bots seat themselves in the public room and wake its round loop; with
   // them churning between BOT_MIN and BOT_MAX the room never idles again.
