@@ -14,7 +14,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const ANALYTICS_DIR = (process.env.ANALYTICS_DIR || path.join(__dirname, 'analytics')).trim();
+// Priority: explicit ANALYTICS_DIR > attached Railway volume > local ./analytics.
+// Railway injects RAILWAY_VOLUME_MOUNT_PATH automatically when a volume is
+// attached, so just mounting a volume at /data is enough — no variable needed.
+const ANALYTICS_DIR = (process.env.ANALYTICS_DIR
+  || (process.env.RAILWAY_VOLUME_MOUNT_PATH
+    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'analytics')
+    : path.join(__dirname, 'analytics'))).trim();
 const KEEP_DAYS = 2; // how many UTC day buckets stay in memory
 
 function dayKey(t = Date.now()) {
